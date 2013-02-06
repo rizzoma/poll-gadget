@@ -1,0 +1,23 @@
+.variant {
+    height: 35px;
+}
+
+.variant-name {
+    display: inline-block;
+    line-height: 35px;
+}
+
+.voter_count {
+    display: inline-block;
+    line-height: 35px;
+}
+
+.avatar {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    background: no-repeat center center;
+    background-size: 30px;
+    margin: 2px;
+    vertical-align: middle;
+}

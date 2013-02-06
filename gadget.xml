@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Module>
+    <ModulePrefs title="Polls for Rizzoma" author="Mikhail Demerzov" author_email="demerzov@gmail.com">
+        <Require feature="wave" />
+        <Require feature="dynamic-height" />
+    </ModulePrefs>
+    <Content type="html">
+        <![CDATA[ %% htm/index.htm %% ]]>
+    </Content>
+</Module>
