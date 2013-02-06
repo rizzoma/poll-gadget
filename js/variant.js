@@ -49,7 +49,7 @@ Variant.prototype._updateVoterCount = function() {
     this._node.find('.voter_count').text(text);
 };
 
-Variant.prototype.addUser = function(user) {
+Variant.prototype.addUser = function(user, isCurrentUser) {
     this._users.push(user);
     var node = $('<span class="avatar user_' + user.getId() + '"></span>');
     var name = user.getName();
@@ -62,6 +62,10 @@ Variant.prototype.addUser = function(user) {
     }
     this._node.find('.voters').append(node);
     this._updateVoterCount();
+    if (isCurrentUser) {
+        this._node.addClass('voted');
+        this._node.find(':radio').prop('checked', true);
+    }
 };
 
 Variant.prototype.removeUser = function(userId) {
@@ -78,16 +82,6 @@ Variant.prototype.removeUser = function(userId) {
     this._updateVoterCount();
 };
 
-Variant.prototype.removeAllUsers = function() {
-    var ids = [];
-    for (var i in this._users) {
-        ids.push(this._users[i].getId());
-    }
-    for (var i in ids) {
-        this.removeUser(ids[i]);
-    }
-};
-
 Variant.prototype.hasUser = function(userId) {
     for (var i in this._users) {
         if (this._users[i].getId() == userId) {
@@ -95,4 +89,16 @@ Variant.prototype.hasUser = function(userId) {
         }
     }
     return false;
+};
+
+Variant.prototype.reset = function() {
+    var ids = [];
+    for (var i in this._users) {
+        ids.push(this._users[i].getId());
+    }
+    for (var i in ids) {
+        this.removeUser(ids[i]);
+    }
+    this._node.removeClass('voted');
+    this._node.find(':radio').prop('checked', false);
 };

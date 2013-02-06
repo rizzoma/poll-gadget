@@ -2,6 +2,10 @@
     height: 35px;
 }
 
+.variant.voted {
+    background: lightgreen;
+}
+
 .variant-name {
     display: inline-block;
     line-height: 35px;

@@ -91,13 +91,14 @@ Poll.prototype._updateVotes = function(votes) {
         return;
     }
     for (var i in this._variants) {
-        this._variants[i].removeAllUsers();
+        this._variants[i].reset();
     }
     for (var variantId in votes) {
         var variant = this._getVariantById(variantId);
         var users = votes[variantId];
         for (var j in users) {
-            variant.addUser(users[j]);
+            var user = users[j];
+            variant.addUser(user, user.getId() == this._viewer.getId());
         }
     }
 };
@@ -105,8 +106,4 @@ Poll.prototype._updateVotes = function(votes) {
 Poll.prototype.updateState = function(state) {
     this._updateVariants(state.variants);
     this._updateVotes(state.votes);
-};
-
-Poll.prototype.updateUsers = function() {
-
 };
