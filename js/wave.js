@@ -2,7 +2,15 @@ var Converter = function() {
     
 };
 
-Converter.prototype.participant2user = function (participant) {
+Converter.prototype._serialize = function(object) {
+    return gadgets.json.stringify(object);
+};
+
+Converter.prototype._unserialize = function(string) {
+    return gadgets.json.parse(string);
+};
+
+Converter.prototype.participant2user = function(participant) {
     var id = participant.getId();
     var name = participant.getDisplayName();
     var avatar = participant.getThumbnailUrl();
@@ -14,11 +22,11 @@ Converter.prototype.state2variants = function(state) {
     if (!value) {
         return [];
     }
-    return gadgets.json.parse(value);
+    return this._unserialize(value);
 };
 
 Converter.prototype.variants2state = function(variants) {
-    return {variants: gadgets.json.stringify(variants)};
+    return {variants: this._serialize(variants)};
 };
 
 Converter.prototype.state2votes = function(state) {
@@ -26,56 +34,84 @@ Converter.prototype.state2votes = function(state) {
     var votes = {};
     for (var i in keys) {
         var key = keys[i];
-        if (key.slice(0, 6) != 'votes_') {
+        if (key.slice(0, 6) != 'votes|') {
             continue;
         }
-        var userId = key.slice(6);
+        var parts = key.split('|');
+        var userId = parts[1];
+        var mode = Boolean(Number(parts[2]));
         var user = this.participant2user(wave.getParticipantById(userId));
-        var variants = gadgets.json.parse(state.get(key));
+        var variants = this._unserialize(state.get(key));
         for (var j in variants) {
             var variant = variants[j];
-            if (!(variant in votes)) {
-                votes[variant] = [];
+            if (!(mode in votes)) {
+                votes[mode] = {};
             }
-            votes[variant].push(user); 
+            var modeVotes = votes[mode];
+            if (!(variant in modeVotes)) {
+                modeVotes[variant] = [];
+            }
+            modeVotes[variant].push(user); 
         }
     }
     return votes;
 };
 
-Converter.prototype.votes2state = function(id, variants) {
+Converter.prototype.votes2state = function(userId, variants, mode) {
     var delta = {};
-    delta['votes_' + id] = gadgets.json.stringify(variants);
+    delta['votes|' + userId + '|' + Number(mode)] = this._serialize(variants);
     return delta;
+};
+
+Converter.prototype.state2options = function(state) {
+    var value = state.get('options');
+    if (!value) {
+        return {};
+    }
+    return this._unserialize(value);
+};
+
+Converter.prototype.options2state = function(options) {
+    return {options: this._serialize(options)};
 };
 
 var WaveConnector = function() {
     this._converter = new Converter();
 };
 
-WaveConnector.prototype._onNewVariant = function(name) {
+WaveConnector.prototype._onNewVariant = function(id, name) {
     var state = wave.getState();
     var variants = this._converter.state2variants(state);
-    variants.push({
-        id: variants.length,
-        name: name
-    });
-    state.submitDelta(this._converter.variants2state(variants));
+    variants.push({id: id, name: name});
+    var delta = this._converter.variants2state(variants);
+    state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onVote = function(id, variants) {
+WaveConnector.prototype._onVote = function(userId, variants, mode) {
     var state = wave.getState();
-    state.submitDelta(this._converter.votes2state(id, variants));
+    var delta = this._converter.votes2state(userId, variants, mode);
+    state.submitDelta(delta);
+};
+
+WaveConnector.prototype._onOptionsChange = function(options) {
+    var state = wave.getState();
+    var delta = this._converter.options2state(options)
+    state.submitDelta(delta);
 };
 
 WaveConnector.prototype._onLoad = function() {
     var viewer = this._converter.participant2user(wave.getViewer());
-    var poll = new Poll(viewer, $.proxy(this._onNewVariant, this), $.proxy(this._onVote, this));
+    var poll = new Poll(viewer, {
+        onNewVariant: $.proxy(this._onNewVariant, this),
+        onVote: $.proxy(this._onVote, this),
+        onOptionsChange: $.proxy(this._onOptionsChange, this)
+    });
     wave.setStateCallback($.proxy(function() {
         var state = wave.getState();
         poll.updateState({
             variants: this._converter.state2variants(state),
-            votes: this._converter.state2votes(state)
+            votes: this._converter.state2votes(state),
+            options: this._converter.state2options(state)
         });
     }, this));
     poll.init();

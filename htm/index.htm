@@ -2,19 +2,21 @@
 <html>
     <head>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+        <script> %% js/options.js %% </script>
+        <script> %% js/poll.js %% </script>
         <script> %% js/user.js %% </script>
         <script> %% js/variant.js %% </script>
-        <script> %% js/poll.js %% </script>
         <script> %% js/wave.js %% </script>
         <style> %% css/styles.css %% </style>
     </head>
     <body>
-        <div id="poll">
-            
-        </div>
+        <div id="poll"></div>
         <form id="add-variant" action="">
             <input type="text" placeholder="Add a new variant">
             <input type="submit" value="Add">
         </form>
+        <div id="options">
+            <label><input type="checkbox" name="singleVariantVoting"> Single variant voting</label>
+        </div>
     </body>
 </html>

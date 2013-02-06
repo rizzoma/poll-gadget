@@ -9,6 +9,176 @@
 <html>
     <head>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+        <script> var Options = function(callbacks) {
+    this._options = {};
+    this._node = $('#options');
+    this._callbacks = callbacks;
+};
+
+Options.prototype.isSingleVariantVoting = function() {
+    return this._options.singleVariantVoting == true;
+};
+
+Options.prototype._addCheckedListener = function() {
+    this._node.on('change', ':checkbox', $.proxy(function(event) {
+        var options = $.extend({}, this._options);
+        var checkbox = $(event.target);
+        if (checkbox.attr('name') == 'singleVariantVoting') {
+            options.singleVariantVoting = checkbox.is(':checked');
+        }
+        this._callbacks.onChange(options);
+    }, this));
+};
+
+Options.prototype.init = function() {
+    this._addCheckedListener();
+};
+
+Options.prototype._getUpdatedOptions = function(options) {
+    var updated = [];
+    for (var i in options) {
+        if (this._options[i] != options[i]) {
+            updated.push(i);
+        }
+    }
+    return updated;
+};
+
+Options.prototype.update = function(options) {
+    var updated = this._getUpdatedOptions(options);
+    this._options = options;
+    if (updated.length) {
+        this._callbacks.onUpdate(updated);
+    }
+};
+ </script>
+        <script> var Poll = function(viewer, callbacks) {
+    this._viewer = viewer;
+    this._variants = [];
+    this._node = $('#poll');
+    this._callbacks = callbacks;
+    this._initOptions();
+};
+
+Poll.prototype._initOptions = function() {
+    this._options = new Options({
+        onChange: this._callbacks.onOptionsChange,
+        onUpdate: $.proxy(function(updated) {
+            if ($.inArray('singleVariantVoting', updated) == -1) {
+                return;
+            }
+            var isExclusive = this._options.isSingleVariantVoting();
+            for (var i in this._variants) {
+                var variant = this._variants[i];
+                variant.setExclusive(isExclusive);
+            }
+        }, this)
+    });
+    this._options.init();
+};
+
+Poll.prototype._getVariantById = function(id) {
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        if (variant.getId() == id) {
+            return variant;
+        }
+    }
+    return null;
+};
+
+Poll.prototype._isVariantExist = function(name) {
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        if (variant.getName() == name) {
+            return true;
+        }
+    }
+    return false;
+};
+
+Poll.prototype._addSubmitListener = function() {
+    $('#add-variant').submit($.proxy(function(event) {
+        var text = $(event.target).find(':text');
+        var name = text.val().replace(/^\s+|\s+$/, '');
+        if (name && !this._isVariantExist(name)) {
+            this._callbacks.onNewVariant(this._variants.length, name);
+        }
+        text.focus();
+        text.select();
+        return false;
+    }, this));
+};
+
+Poll.prototype.init = function() {
+    this._addSubmitListener();
+};
+
+Poll.prototype._getVotedVariants = function() {
+    var voted = [];
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        if (variant.hasVote()) {
+            voted.push(variant.getId());
+        }
+    }
+    return voted;
+};
+
+Poll.prototype._addVariant = function(id, name) {
+    var variant = new Variant(id, name, {
+        onVote: $.proxy(function() {
+            var voted = this._getVotedVariants();
+            this._callbacks.onVote(this._viewer.getId(), voted, this._options.isSingleVariantVoting());
+        }, this)
+    });
+    var isExclusive = this._options.isSingleVariantVoting();
+    variant.setExclusive(isExclusive);
+    this._variants.push(variant);
+    this._node.append(variant.getNode());
+};
+
+Poll.prototype._updateOptions = function(options) {
+    this._options.update(options);
+};
+
+Poll.prototype._updateVariants = function(variants) {
+    if (!variants) {
+        return;
+    }
+    for (var i in variants) {
+        var variant = variants[i];
+        if (!this._isVariantExist(variant.name)) {
+            this._addVariant(variant.id, variant.name);
+        }
+    }
+};
+
+Poll.prototype._updateVotes = function(votes) {
+    if (!votes) {
+        return;
+    }
+    for (var i in this._variants) {
+        this._variants[i].reset();
+    }
+    var mode = this._options.isSingleVariantVoting();
+    var modeVotes = votes[mode] || {};
+    for (var variantId in modeVotes) {
+        var variant = this._getVariantById(variantId);
+        var users = modeVotes[variantId];
+        for (var j in users) {
+            var user = users[j];
+            variant.addUser(user, user.getId() == this._viewer.getId());
+        }
+    }
+};
+
+Poll.prototype.updateState = function(state) {
+    this._updateOptions(state.options);
+    this._updateVariants(state.variants);
+    this._updateVotes(state.votes);
+};
+ </script>
         <script> var User = function(id, name, avatar) {
     this._id = id;
     this._name = name;
@@ -27,12 +197,32 @@ User.prototype.getAvatar = function() {
     return this._avatar;
 };
  </script>
-        <script> var Variant = function(id, name, onSelected) {
+        <script> var Variant = function(id, name, callbacks) {
     this._id = id;
     this._name = name;
     this._users = [];
-    this._node = null;
-    this._onSelected = onSelected;
+    this._callbacks = callbacks;
+    this._createNode();
+};
+
+Variant.prototype._addCheckedListener = function() {
+    this._node.on('change', ':checkbox,:radio', $.proxy(function(event) {
+        this._callbacks.onVote();
+    }, this));
+};
+
+Variant.prototype._createNode = function() {
+    this._node = $(
+        '<div class="variant"> \
+            <label class="variant-name-container"> \
+                <input type="checkbox" name="variant"><span class="variant-name"></span> \
+            </label> \
+            <span class="voter_count"></span> \
+            <span class="voters"></span> \
+        </div>'
+    );
+    this._node.find('.variant-name').text(this._name);
+    this._addCheckedListener();
 };
 
 Variant.prototype.getId = function() {
@@ -43,34 +233,17 @@ Variant.prototype.getName = function() {
     return this._name;
 };
 
-Variant.prototype._createNode = function() {
-    this._node = $(
-        '<div class="variant"> \
-            <label class="variant-name" style="width: 100px"> \
-                <input type="radio" name="variant"> ' + this._name + ' \
-            </label> \
-            <span class="voter_count"></span> \
-            <span class="voters"></span> \
-        </div>'
-    );
-};
-
-Variant.prototype._addCheckedListener = function() {
-    this._node.on('change', ':radio', $.proxy(function(event) {
-        this._onSelected();
-    }, this));
-};
-
 Variant.prototype.getNode = function() {
-    if (!this._node) {
-        this._createNode();
-        this._addCheckedListener();
-    }
     return this._node;
 };
 
+Variant.prototype.setExclusive = function(isExclusive) {
+    var type = isExclusive ? 'radio' : 'checkbox';
+    this._node.find(':checkbox,:radio').attr('type', type);
+};
+
 Variant.prototype.hasVote = function() {
-    return this._node.find(':radio').is(':checked');
+    return this._node.find(':checkbox,:radio').is(':checked');
 };
 
 Variant.prototype._updateVoterCount = function() {
@@ -93,7 +266,7 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
     this._updateVoterCount();
     if (isCurrentUser) {
         this._node.addClass('voted');
-        this._node.find(':radio').prop('checked', true);
+        this._node.find(':checkbox,:radio').prop('checked', true);
     }
 };
 
@@ -129,124 +302,22 @@ Variant.prototype.reset = function() {
         this.removeUser(ids[i]);
     }
     this._node.removeClass('voted');
-    this._node.find(':radio').prop('checked', false);
-};
- </script>
-        <script> var Poll = function(viewer, onNewVariant, onVote) {
-    this._users = null;
-    this._viewer = viewer;
-    this._variants = [];
-    this._node = $('#poll');
-    this._onNewVariant = onNewVariant;
-    this._onVote = onVote;
-};
-
-Poll.prototype._getUserById = function(id) {
-    for (var i in this._users) {
-        var user = this._users[i];
-        if (user.getId() == id) {
-            return user;
-        }
-    }
-    return null;
-};
-
-Poll.prototype._getVariantById = function(id) {
-    for (var i in this._variants) {
-        var variant = this._variants[i];
-        if (variant.getId() == id) {
-            return variant;
-        }
-    }
-    return null;
-};
-
-Poll.prototype._isVariantExist = function(name) {
-    for (var i in this._variants) {
-        var variant = this._variants[i];
-        if (variant.getName() == name) {
-            return true;
-        }
-    }
-    return false;
-};
-
-Poll.prototype._addSubmitListener = function() {
-    $('#add-variant').submit($.proxy(function(event) {
-        var text = $(event.target).find(':text')
-        var variant = text.val();
-        if (!this._isVariantExist(variant)) {
-            this._onNewVariant(variant);
-        }
-        text.focus();
-        text.select();
-        return false;
-    }, this));
-};
-
-Poll.prototype.init = function() {
-    this._addSubmitListener();
-};
-
-Poll.prototype._getVotedVariants = function() {
-    var voted = [];
-    for (var i in this._variants) {
-        var variant = this._variants[i];
-        if (variant.hasVote()) {
-            voted.push(variant.getId());
-        }
-    }
-    return voted;
-};
-
-Poll.prototype._addVariant = function(id, name) {
-    var variant = new Variant(id, name, $.proxy(function() {
-        var voted = this._getVotedVariants();
-        this._onVote(this._viewer.getId(), voted);
-    }, this));
-    this._variants.push(variant);
-    this._node.append(variant.getNode());
-};
-
-Poll.prototype._updateVariants = function(variants) {
-    if (!variants) {
-        return;
-    }
-    for (var i in variants) {
-        var variant = variants[i];
-        if (!this._isVariantExist(variant.name)) {
-            this._addVariant(variant.id, variant.name);
-        }
-    }
-};
-
-Poll.prototype._updateVotes = function(votes) {
-    if (!votes) {
-        return;
-    }
-    for (var i in this._variants) {
-        this._variants[i].reset();
-    }
-    for (var variantId in votes) {
-        var variant = this._getVariantById(variantId);
-        var users = votes[variantId];
-        for (var j in users) {
-            var user = users[j];
-            variant.addUser(user, user.getId() == this._viewer.getId());
-        }
-    }
-};
-
-Poll.prototype.updateState = function(state) {
-    this._updateVariants(state.variants);
-    this._updateVotes(state.votes);
+    this._node.find(':checkbox,:radio').prop('checked', false);
 };
  </script>
         <script> var Converter = function() {
     
 };
 
-Converter.prototype.participant2user = function (participant) {
+Converter.prototype._serialize = function(object) {
+    return gadgets.json.stringify(object);
+};
+
+Converter.prototype._unserialize = function(string) {
+    return gadgets.json.parse(string);
+};
+
+Converter.prototype.participant2user = function(participant) {
     var id = participant.getId();
     var name = participant.getDisplayName();
     var avatar = participant.getThumbnailUrl();
@@ -258,11 +329,11 @@ Converter.prototype.state2variants = function(state) {
     if (!value) {
         return [];
     }
-    return gadgets.json.parse(value);
+    return this._unserialize(value);
 };
 
 Converter.prototype.variants2state = function(variants) {
-    return {variants: gadgets.json.stringify(variants)};
+    return {variants: this._serialize(variants)};
 };
 
 Converter.prototype.state2votes = function(state) {
@@ -270,56 +341,84 @@ Converter.prototype.state2votes = function(state) {
     var votes = {};
     for (var i in keys) {
         var key = keys[i];
-        if (key.slice(0, 6) != 'votes_') {
+        if (key.slice(0, 6) != 'votes|') {
             continue;
         }
-        var userId = key.slice(6);
+        var parts = key.split('|');
+        var userId = parts[1];
+        var mode = Boolean(Number(parts[2]));
         var user = this.participant2user(wave.getParticipantById(userId));
-        var variants = gadgets.json.parse(state.get(key));
+        var variants = this._unserialize(state.get(key));
         for (var j in variants) {
             var variant = variants[j];
-            if (!(variant in votes)) {
-                votes[variant] = [];
+            if (!(mode in votes)) {
+                votes[mode] = {};
             }
-            votes[variant].push(user); 
+            var modeVotes = votes[mode];
+            if (!(variant in modeVotes)) {
+                modeVotes[variant] = [];
+            }
+            modeVotes[variant].push(user); 
         }
     }
     return votes;
 };
 
-Converter.prototype.votes2state = function(id, variants) {
+Converter.prototype.votes2state = function(userId, variants, mode) {
     var delta = {};
-    delta['votes_' + id] = gadgets.json.stringify(variants);
+    delta['votes|' + userId + '|' + Number(mode)] = this._serialize(variants);
     return delta;
+};
+
+Converter.prototype.state2options = function(state) {
+    var value = state.get('options');
+    if (!value) {
+        return {};
+    }
+    return this._unserialize(value);
+};
+
+Converter.prototype.options2state = function(options) {
+    return {options: this._serialize(options)};
 };
 
 var WaveConnector = function() {
     this._converter = new Converter();
 };
 
-WaveConnector.prototype._onNewVariant = function(name) {
+WaveConnector.prototype._onNewVariant = function(id, name) {
     var state = wave.getState();
     var variants = this._converter.state2variants(state);
-    variants.push({
-        id: variants.length,
-        name: name
-    });
-    state.submitDelta(this._converter.variants2state(variants));
+    variants.push({id: id, name: name});
+    var delta = this._converter.variants2state(variants);
+    state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onVote = function(id, variants) {
+WaveConnector.prototype._onVote = function(userId, variants, mode) {
     var state = wave.getState();
-    state.submitDelta(this._converter.votes2state(id, variants));
+    var delta = this._converter.votes2state(userId, variants, mode);
+    state.submitDelta(delta);
+};
+
+WaveConnector.prototype._onOptionsChange = function(options) {
+    var state = wave.getState();
+    var delta = this._converter.options2state(options)
+    state.submitDelta(delta);
 };
 
 WaveConnector.prototype._onLoad = function() {
     var viewer = this._converter.participant2user(wave.getViewer());
-    var poll = new Poll(viewer, $.proxy(this._onNewVariant, this), $.proxy(this._onVote, this));
+    var poll = new Poll(viewer, {
+        onNewVariant: $.proxy(this._onNewVariant, this),
+        onVote: $.proxy(this._onVote, this),
+        onOptionsChange: $.proxy(this._onOptionsChange, this)
+    });
     wave.setStateCallback($.proxy(function() {
         var state = wave.getState();
         poll.updateState({
             variants: this._converter.state2variants(state),
-            votes: this._converter.state2votes(state)
+            votes: this._converter.state2votes(state),
+            options: this._converter.state2options(state)
         });
     }, this));
     poll.init();
@@ -340,14 +439,17 @@ connector.init();
     background: lightgreen;
 }
 
-.variant-name {
+.variant-name-container {
     display: inline-block;
     line-height: 35px;
+    width: 100px;
 }
 
 .voter_count {
     display: inline-block;
     line-height: 35px;
+    width: 40px;
+    text-align: right;
 }
 
 .avatar {
@@ -362,13 +464,14 @@ connector.init();
  </style>
     </head>
     <body>
-        <div id="poll">
-            
-        </div>
+        <div id="poll"></div>
         <form id="add-variant" action="">
             <input type="text" placeholder="Add a new variant">
             <input type="submit" value="Add">
         </form>
+        <div id="options">
+            <label><input type="checkbox" name="singleVariantVoting"> Single variant voting</label>
+        </div>
     </body>
 </html>
  ]]>

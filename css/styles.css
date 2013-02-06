@@ -6,14 +6,17 @@
     background: lightgreen;
 }
 
-.variant-name {
+.variant-name-container {
     display: inline-block;
     line-height: 35px;
+    width: 100px;
 }
 
 .voter_count {
     display: inline-block;
     line-height: 35px;
+    width: 40px;
+    text-align: right;
 }
 
 .avatar {

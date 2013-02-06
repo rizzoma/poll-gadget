@@ -1,9 +1,29 @@
-var Variant = function(id, name, onSelected) {
+var Variant = function(id, name, callbacks) {
     this._id = id;
     this._name = name;
     this._users = [];
-    this._node = null;
-    this._onSelected = onSelected;
+    this._callbacks = callbacks;
+    this._createNode();
+};
+
+Variant.prototype._addCheckedListener = function() {
+    this._node.on('change', ':checkbox,:radio', $.proxy(function(event) {
+        this._callbacks.onVote();
+    }, this));
+};
+
+Variant.prototype._createNode = function() {
+    this._node = $(
+        '<div class="variant"> \
+            <label class="variant-name-container"> \
+                <input type="checkbox" name="variant"><span class="variant-name"></span> \
+            </label> \
+            <span class="voter_count"></span> \
+            <span class="voters"></span> \
+        </div>'
+    );
+    this._node.find('.variant-name').text(this._name);
+    this._addCheckedListener();
 };
 
 Variant.prototype.getId = function() {
@@ -14,34 +34,17 @@ Variant.prototype.getName = function() {
     return this._name;
 };
 
-Variant.prototype._createNode = function() {
-    this._node = $(
-        '<div class="variant"> \
-            <label class="variant-name" style="width: 100px"> \
-                <input type="radio" name="variant"> ' + this._name + ' \
-            </label> \
-            <span class="voter_count"></span> \
-            <span class="voters"></span> \
-        </div>'
-    );
-};
-
-Variant.prototype._addCheckedListener = function() {
-    this._node.on('change', ':radio', $.proxy(function(event) {
-        this._onSelected();
-    }, this));
-};
-
 Variant.prototype.getNode = function() {
-    if (!this._node) {
-        this._createNode();
-        this._addCheckedListener();
-    }
     return this._node;
 };
 
+Variant.prototype.setExclusive = function(isExclusive) {
+    var type = isExclusive ? 'radio' : 'checkbox';
+    this._node.find(':checkbox,:radio').attr('type', type);
+};
+
 Variant.prototype.hasVote = function() {
-    return this._node.find(':radio').is(':checked');
+    return this._node.find(':checkbox,:radio').is(':checked');
 };
 
 Variant.prototype._updateVoterCount = function() {
@@ -64,7 +67,7 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
     this._updateVoterCount();
     if (isCurrentUser) {
         this._node.addClass('voted');
-        this._node.find(':radio').prop('checked', true);
+        this._node.find(':checkbox,:radio').prop('checked', true);
     }
 };
 
@@ -100,5 +103,5 @@ Variant.prototype.reset = function() {
         this.removeUser(ids[i]);
     }
     this._node.removeClass('voted');
-    this._node.find(':radio').prop('checked', false);
+    this._node.find(':checkbox,:radio').prop('checked', false);
 };
