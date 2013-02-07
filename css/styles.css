@@ -28,3 +28,7 @@
     margin: 2px;
     vertical-align: middle;
 }
+
+#options label {
+    display: block;
+}

@@ -15,41 +15,41 @@
     this._callbacks = callbacks;
 };
 
+Options.prototype.SORTING = {
+    NONE: 0,
+    BY_NAME: 1,
+    BY_VOTE: 2
+};
+
 Options.prototype.isSingleVariantVoting = function() {
     return this._options.singleVariantVoting == true;
 };
 
-Options.prototype._addCheckedListener = function() {
-    this._node.on('change', ':checkbox', $.proxy(function(event) {
+Options.prototype.getSortingOrder = function() {
+    return this._options.sorting;
+};
+
+Options.prototype._addChangeListener = function() {
+    this._node.on('change', ':checkbox,select', $.proxy(function(event) {
         var options = $.extend({}, this._options);
-        var checkbox = $(event.target);
-        if (checkbox.attr('name') == 'singleVariantVoting') {
-            options.singleVariantVoting = checkbox.is(':checked');
+        var element = $(event.target);
+        var name = element.attr('name');
+        if (name == 'singleVariantVoting') {
+            options.singleVariantVoting = element.is(':checked');
+        }
+        if (name == 'sorting') {
+            options.sorting = Number(element.val());
         }
         this._callbacks.onChange(options);
     }, this));
 };
 
 Options.prototype.init = function() {
-    this._addCheckedListener();
-};
-
-Options.prototype._getUpdatedOptions = function(options) {
-    var updated = [];
-    for (var i in options) {
-        if (this._options[i] != options[i]) {
-            updated.push(i);
-        }
-    }
-    return updated;
+    this._addChangeListener();
 };
 
 Options.prototype.update = function(options) {
-    var updated = this._getUpdatedOptions(options);
     this._options = options;
-    if (updated.length) {
-        this._callbacks.onUpdate(updated);
-    }
 };
  </script>
         <script> var Poll = function(viewer, callbacks) {
@@ -62,17 +62,7 @@ Options.prototype.update = function(options) {
 
 Poll.prototype._initOptions = function() {
     this._options = new Options({
-        onChange: this._callbacks.onOptionsChange,
-        onUpdate: $.proxy(function(updated) {
-            if ($.inArray('singleVariantVoting', updated) == -1) {
-                return;
-            }
-            var isExclusive = this._options.isSingleVariantVoting();
-            for (var i in this._variants) {
-                var variant = this._variants[i];
-                variant.setExclusive(isExclusive);
-            }
-        }, this)
+        onChange: this._callbacks.onOptionsChange
     });
     this._options.init();
 };
@@ -143,24 +133,21 @@ Poll.prototype._updateOptions = function(options) {
 };
 
 Poll.prototype._updateVariants = function(variants) {
-    if (!variants) {
-        return;
+    for (var i in this._variants) {
+        this._variants[i].reset();
     }
+    var isExclusive = this._options.isSingleVariantVoting();
     for (var i in variants) {
         var variant = variants[i];
         if (!this._isVariantExist(variant.name)) {
             this._addVariant(variant.id, variant.name);
+        } else {
+            this._getVariantById(variant.id).setExclusive(isExclusive);
         }
     }
 };
 
 Poll.prototype._updateVotes = function(votes) {
-    if (!votes) {
-        return;
-    }
-    for (var i in this._variants) {
-        this._variants[i].reset();
-    }
     var mode = this._options.isSingleVariantVoting();
     var modeVotes = votes[mode] || {};
     for (var variantId in modeVotes) {
@@ -173,10 +160,45 @@ Poll.prototype._updateVotes = function(votes) {
     }
 };
 
+Poll.prototype._getSortFunction = function() {
+    var order = this._options.getSortingOrder();
+    if (order == this._options.SORTING.NONE) {
+        return function(a, b) {
+            return a.getId() > b.getId() ? 1 : -1;
+        };
+    }
+    if (order == this._options.SORTING.BY_NAME) {
+        return function(a, b) {
+            return a.getName() > b.getName() ? 1 : -1;
+        };
+    }
+    if (order == this._options.SORTING.BY_VOTE) {
+        return function(a, b) {
+            if (a.getVoteCount() == b.getVoteCount()) {
+                return a.getName() > b.getName() ? 1 : -1;
+            }
+            return a.getVoteCount() > b.getVoteCount() ? -1 : 1;
+        };
+    }
+};
+
+Poll.prototype._sortVariants = function() {
+    var func = this._getSortFunction();
+    this._variants.sort(func);
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        this._node.append(variant.getNode());
+    }
+};
+
 Poll.prototype.updateState = function(state) {
+    if (!state.options || !state.variants || !state.votes) {
+        return;
+    }
     this._updateOptions(state.options);
     this._updateVariants(state.variants);
     this._updateVotes(state.votes);
+    this._sortVariants();
 };
  </script>
         <script> var User = function(id, name, avatar) {
@@ -205,7 +227,7 @@ User.prototype.getAvatar = function() {
     this._createNode();
 };
 
-Variant.prototype._addCheckedListener = function() {
+Variant.prototype._addChangeListener = function() {
     this._node.on('change', ':checkbox,:radio', $.proxy(function(event) {
         this._callbacks.onVote();
     }, this));
@@ -222,7 +244,7 @@ Variant.prototype._createNode = function() {
         </div>'
     );
     this._node.find('.variant-name').text(this._name);
-    this._addCheckedListener();
+    this._addChangeListener();
 };
 
 Variant.prototype.getId = function() {
@@ -237,6 +259,10 @@ Variant.prototype.getNode = function() {
     return this._node;
 };
 
+Variant.prototype.getVoteCount = function() {
+    return this._users.length;
+};
+
 Variant.prototype.setExclusive = function(isExclusive) {
     var type = isExclusive ? 'radio' : 'checkbox';
     this._node.find(':checkbox,:radio').attr('type', type);
@@ -247,7 +273,8 @@ Variant.prototype.hasVote = function() {
 };
 
 Variant.prototype._updateVoterCount = function() {
-    var text = this._users.length ? '(' + this._users.length + ')' : '';
+    var count = this.getVoteCount();
+    var text = count ? '(' + count + ')' : '';
     this._node.find('.voter_count').text(text);
 };
 
@@ -461,6 +488,10 @@ connector.init();
     margin: 2px;
     vertical-align: middle;
 }
+
+#options label {
+    display: block;
+}
  </style>
     </head>
     <body>
@@ -471,6 +502,13 @@ connector.init();
         </form>
         <div id="options">
             <label><input type="checkbox" name="singleVariantVoting"> Single variant voting</label>
+            <label>
+                <select name="sorting">
+                    <option value="0">No sorting</option>
+                    <option value="1">Sort alphanumerical</option>
+                    <option value="2">Sort by votes, alphanumerical</option>
+                </select>
+            </label>
         </div>
     </body>
 </html>

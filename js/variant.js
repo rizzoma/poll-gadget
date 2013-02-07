@@ -6,7 +6,7 @@ var Variant = function(id, name, callbacks) {
     this._createNode();
 };
 
-Variant.prototype._addCheckedListener = function() {
+Variant.prototype._addChangeListener = function() {
     this._node.on('change', ':checkbox,:radio', $.proxy(function(event) {
         this._callbacks.onVote();
     }, this));
@@ -23,7 +23,7 @@ Variant.prototype._createNode = function() {
         </div>'
     );
     this._node.find('.variant-name').text(this._name);
-    this._addCheckedListener();
+    this._addChangeListener();
 };
 
 Variant.prototype.getId = function() {
@@ -38,6 +38,10 @@ Variant.prototype.getNode = function() {
     return this._node;
 };
 
+Variant.prototype.getVoteCount = function() {
+    return this._users.length;
+};
+
 Variant.prototype.setExclusive = function(isExclusive) {
     var type = isExclusive ? 'radio' : 'checkbox';
     this._node.find(':checkbox,:radio').attr('type', type);
@@ -48,7 +52,8 @@ Variant.prototype.hasVote = function() {
 };
 
 Variant.prototype._updateVoterCount = function() {
-    var text = this._users.length ? '(' + this._users.length + ')' : '';
+    var count = this.getVoteCount();
+    var text = count ? '(' + count + ')' : '';
     this._node.find('.voter_count').text(text);
 };
 

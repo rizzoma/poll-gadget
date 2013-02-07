@@ -4,39 +4,39 @@ var Options = function(callbacks) {
     this._callbacks = callbacks;
 };
 
+Options.prototype.SORTING = {
+    NONE: 0,
+    BY_NAME: 1,
+    BY_VOTE: 2
+};
+
 Options.prototype.isSingleVariantVoting = function() {
     return this._options.singleVariantVoting == true;
 };
 
-Options.prototype._addCheckedListener = function() {
-    this._node.on('change', ':checkbox', $.proxy(function(event) {
+Options.prototype.getSortingOrder = function() {
+    return this._options.sorting;
+};
+
+Options.prototype._addChangeListener = function() {
+    this._node.on('change', ':checkbox,select', $.proxy(function(event) {
         var options = $.extend({}, this._options);
-        var checkbox = $(event.target);
-        if (checkbox.attr('name') == 'singleVariantVoting') {
-            options.singleVariantVoting = checkbox.is(':checked');
+        var element = $(event.target);
+        var name = element.attr('name');
+        if (name == 'singleVariantVoting') {
+            options.singleVariantVoting = element.is(':checked');
+        }
+        if (name == 'sorting') {
+            options.sorting = Number(element.val());
         }
         this._callbacks.onChange(options);
     }, this));
 };
 
 Options.prototype.init = function() {
-    this._addCheckedListener();
-};
-
-Options.prototype._getUpdatedOptions = function(options) {
-    var updated = [];
-    for (var i in options) {
-        if (this._options[i] != options[i]) {
-            updated.push(i);
-        }
-    }
-    return updated;
+    this._addChangeListener();
 };
 
 Options.prototype.update = function(options) {
-    var updated = this._getUpdatedOptions(options);
     this._options = options;
-    if (updated.length) {
-        this._callbacks.onUpdate(updated);
-    }
 };

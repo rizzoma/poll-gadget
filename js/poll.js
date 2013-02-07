@@ -8,17 +8,7 @@ var Poll = function(viewer, callbacks) {
 
 Poll.prototype._initOptions = function() {
     this._options = new Options({
-        onChange: this._callbacks.onOptionsChange,
-        onUpdate: $.proxy(function(updated) {
-            if ($.inArray('singleVariantVoting', updated) == -1) {
-                return;
-            }
-            var isExclusive = this._options.isSingleVariantVoting();
-            for (var i in this._variants) {
-                var variant = this._variants[i];
-                variant.setExclusive(isExclusive);
-            }
-        }, this)
+        onChange: this._callbacks.onOptionsChange
     });
     this._options.init();
 };
@@ -89,24 +79,21 @@ Poll.prototype._updateOptions = function(options) {
 };
 
 Poll.prototype._updateVariants = function(variants) {
-    if (!variants) {
-        return;
+    for (var i in this._variants) {
+        this._variants[i].reset();
     }
+    var isExclusive = this._options.isSingleVariantVoting();
     for (var i in variants) {
         var variant = variants[i];
         if (!this._isVariantExist(variant.name)) {
             this._addVariant(variant.id, variant.name);
+        } else {
+            this._getVariantById(variant.id).setExclusive(isExclusive);
         }
     }
 };
 
 Poll.prototype._updateVotes = function(votes) {
-    if (!votes) {
-        return;
-    }
-    for (var i in this._variants) {
-        this._variants[i].reset();
-    }
     var mode = this._options.isSingleVariantVoting();
     var modeVotes = votes[mode] || {};
     for (var variantId in modeVotes) {
@@ -119,8 +106,43 @@ Poll.prototype._updateVotes = function(votes) {
     }
 };
 
+Poll.prototype._getSortFunction = function() {
+    var order = this._options.getSortingOrder();
+    if (order == this._options.SORTING.NONE) {
+        return function(a, b) {
+            return a.getId() > b.getId() ? 1 : -1;
+        };
+    }
+    if (order == this._options.SORTING.BY_NAME) {
+        return function(a, b) {
+            return a.getName() > b.getName() ? 1 : -1;
+        };
+    }
+    if (order == this._options.SORTING.BY_VOTE) {
+        return function(a, b) {
+            if (a.getVoteCount() == b.getVoteCount()) {
+                return a.getName() > b.getName() ? 1 : -1;
+            }
+            return a.getVoteCount() > b.getVoteCount() ? -1 : 1;
+        };
+    }
+};
+
+Poll.prototype._sortVariants = function() {
+    var func = this._getSortFunction();
+    this._variants.sort(func);
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        this._node.append(variant.getNode());
+    }
+};
+
 Poll.prototype.updateState = function(state) {
+    if (!state.options || !state.variants || !state.votes) {
+        return;
+    }
     this._updateOptions(state.options);
     this._updateVariants(state.variants);
     this._updateVotes(state.votes);
+    this._sortVariants();
 };
