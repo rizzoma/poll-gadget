@@ -1,6 +1,7 @@
 var Poll = function(viewer, callbacks) {
     this._viewer = viewer;
     this._variants = [];
+    this._positions = [];
     this._node = $('#poll');
     this._callbacks = callbacks;
     this._initOptions();
@@ -28,6 +29,10 @@ Poll.prototype._getVariantById = function(id) {
     return null;
 };
 
+Poll.prototype._getVariantPosition = function(variant) {
+    return $.inArray(variant.getId(), this._positions);
+};
+
 Poll.prototype._isVariantExist = function(name) {
     for (var i in this._variants) {
         var variant = this._variants[i];
@@ -44,13 +49,17 @@ Poll.prototype._getUpdatedVariants = function(name) {
         var variant = this._variants[i];
         updated.push({
             id: variant.getId(),
-            name: variant.getName()
+            name: variant.getName(),
+            position: this._getVariantPosition(variant)
         });
     }
-    updated.push({
-        id: this._variants.length, 
-        name: name
-    });
+    if (name) {
+        updated.push({
+            id: this._variants.length,
+            name: name,
+            position: this._positions.length
+        });
+    }
     return updated;
 };
 
@@ -59,7 +68,7 @@ Poll.prototype._addSubmitListener = function() {
         var text = $(event.target).find(':text');
         var name = text.val().replace(/^\s+|\s+$/, '');
         if (name && !this._isVariantExist(name)) {
-            var variants = this._getUpdatedVariants();
+            var variants = this._getUpdatedVariants(name);
             this._callbacks.onVariant(variants);
         }
         text.focus();
@@ -94,17 +103,29 @@ Poll.prototype._getUpdatedVotes = function() {
     return updated;
 };
 
-Poll.prototype._addVariant = function(id, name) {
+Poll.prototype._addVariant = function(id, name, position) {
     var variant = new Variant(id, name, {
         onVote: $.proxy(function() {
             var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
             var votes = this._getUpdatedVotes();
             this._callbacks.onVote(mode, votes);
+        }, this),
+        onMove: $.proxy(function(delta) {
+            var position = this._getVariantPosition(variant);
+            var newPosition = position + delta;
+            if (newPosition < 0 || newPosition >= this._positions.length) {
+                return;
+            }
+            this._positions[position] = this._positions[newPosition];
+            this._positions[newPosition] = id;
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
         }, this)
     });
     var isExclusive = this._options.isSingleVariantVoting();
     variant.setExclusive(isExclusive);
     this._variants.push(variant);
+    this._positions[position] = id;
     this._node.append(variant.getNode());
 };
 
@@ -120,7 +141,7 @@ Poll.prototype._updateVariants = function(variants) {
     for (var i in variants) {
         var variant = variants[i];
         if (!this._isVariantExist(variant.name)) {
-            this._addVariant(variant.id, variant.name);
+            this._addVariant(variant.id, variant.name, variant.position);
         } else {
             this._getVariantById(variant.id).setExclusive(isExclusive);
         }
@@ -143,9 +164,9 @@ Poll.prototype._updateVotes = function(votes) {
 Poll.prototype._getSortFunction = function() {
     var order = this._options.getSortingOrder();
     if (order == this._options.SORTING.NONE) {
-        return function(a, b) {
-            return a.getId() > b.getId() ? 1 : -1;
-        };
+        return $.proxy(function(a, b) {
+            return this._getVariantPosition(a) > this._getVariantPosition(b) ? 1 : -1;
+        }, this);
     }
     if (order == this._options.SORTING.BY_NAME) {
         return function(a, b) {

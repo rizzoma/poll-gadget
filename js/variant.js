@@ -7,8 +7,20 @@ var Variant = function(id, name, callbacks) {
 };
 
 Variant.prototype._addChangeListener = function() {
-    this._node.on('change', ':checkbox,:radio', $.proxy(function(event) {
+    this._node.on('change', ':checkbox,:radio', $.proxy(function() {
         this._callbacks.onVote();
+    }, this));
+};
+
+Variant.prototype._addClickListener = function() {
+    this._node.on('click', '.variant-control', $.proxy(function(event) {
+        var element = $(event.target);
+        if (element.hasClass('variant-move-up')) {
+            this._callbacks.onMove(-1);
+        }
+        if (element.hasClass('variant-move-down')) {
+            this._callbacks.onMove(1);
+        }
     }, this));
 };
 
@@ -18,12 +30,17 @@ Variant.prototype._createNode = function() {
             <label class="variant-name-container"> \
                 <input type="checkbox" name="variant"><span class="variant-name"></span> \
             </label> \
-            <span class="voter_count"></span> \
-            <span class="voters"></span> \
+            <span class="variant-controls"> \
+                <button class="variant-control variant-move-up" title="Move up"></button> \
+                <button class="variant-control variant-move-down" title="Move down"></button> \
+            </span> \
+            <span class="variant-vote-count"></span> \
+            <span class="variant-voters"></span> \
         </div>'
     );
     this._node.find('.variant-name').text(this._name);
     this._addChangeListener();
+    this._addClickListener();
 };
 
 Variant.prototype.getId = function() {
@@ -51,10 +68,10 @@ Variant.prototype.hasVote = function() {
     return this._node.find(':checkbox,:radio').is(':checked');
 };
 
-Variant.prototype._updateVoterCount = function() {
+Variant.prototype._updateVoteCount = function() {
     var count = this.getVoteCount();
     var text = count ? '(' + count + ')' : '';
-    this._node.find('.voter_count').text(text);
+    this._node.find('.variant-vote-count').text(text);
 };
 
 Variant.prototype.getUserIds = function() {
@@ -77,7 +94,7 @@ Variant.prototype.hasUser = function(userId) {
 
 Variant.prototype.addUser = function(user, isCurrentUser) {
     this._users.push(user);
-    var node = $('<span class="avatar user_' + user.getId() + '"></span>');
+    var node = $('<span class="variant-avatar variant-user-' + user.getId() + '"></span>');
     var name = user.getName();
     if (name) {
         node.attr('title', name);
@@ -86,8 +103,8 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
     if (avatar) {
         node.css('background-image', 'url(' + avatar + ')');
     }
-    this._node.find('.voters').append(node);
-    this._updateVoterCount();
+    this._node.find('.variant-voters').append(node);
+    this._updateVoteCount();
     if (isCurrentUser) {
         this._node.addClass('voted');
         this._node.find(':checkbox,:radio').prop('checked', true);
@@ -104,8 +121,8 @@ Variant.prototype.removeUser = function(userId) {
             break;
         }
     }
-    this._node.find('.voters .user_' + userId).remove();
-    this._updateVoterCount();
+    this._node.find('.variant-voters .variant-user-' + userId).remove();
+    this._updateVoteCount();
 };
 
 Variant.prototype.reset = function() {

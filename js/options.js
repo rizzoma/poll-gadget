@@ -11,11 +11,11 @@ Options.prototype.SORTING = {
 };
 
 Options.prototype.isSingleVariantVoting = function() {
-    return this._options.singleVariantVoting == true;
+    return this._options.singleVariantVoting || false;
 };
 
 Options.prototype.getSortingOrder = function() {
-    return this._options.sorting;
+    return this._options.sorting || this.SORTING.NONE;
 };
 
 Options.prototype._addChangeListener = function() {

@@ -1,3 +1,8 @@
+* {
+    padding: 0;
+    margin: 0;
+}
+
 .variant {
     height: 35px;
 }
@@ -9,17 +14,55 @@
 .variant-name-container {
     display: inline-block;
     line-height: 35px;
-    width: 100px;
+    width: 250px;
 }
 
-.voter_count {
+.variant-name-container input {
+    margin: 4px;
+    vertical-align: middle;
+}
+
+.variant-controls {
+    visibility: hidden;
+}
+
+.variant:hover .variant-controls {
+    visibility: visible;
+}
+
+.variant-control {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    vertical-align: middle;
+    background: no-repeat url(data:image/png;base64,%% img/icons.png base64 %%);
+    cursor: pointer;
+}
+
+.variant-move-up {
+    background-position: 0 0;
+}
+
+.variant-move-up:hover {
+    background-position: -20px 0;
+}
+
+.variant-move-down {
+    background-position: -40px 0;
+}
+
+.variant-move-down:hover {
+    background-position: -60px 0;
+}
+
+.variant-vote-count {
     display: inline-block;
     line-height: 35px;
     width: 40px;
     text-align: right;
 }
 
-.avatar {
+.variant-avatar {
     display: inline-block;
     width: 30px;
     height: 30px;
@@ -29,6 +72,19 @@
     vertical-align: middle;
 }
 
+#add-variant {
+    padding: 4px;
+}
+
+#add-variant input {
+    padding: 4px;
+}
+
 #options label {
     display: block;
+    padding: 4px;
+}
+
+#options input {
+    vertical-align: middle;
 }

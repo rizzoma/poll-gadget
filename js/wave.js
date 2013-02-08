@@ -26,7 +26,7 @@ Converter.prototype.state2variants = function(state) {
 };
 
 Converter.prototype.variants2state = function(variants) {
-    return {variants: variants};
+    return {variants: this._serialize(variants)};
 };
 
 Converter.prototype.state2votes = function(state) {

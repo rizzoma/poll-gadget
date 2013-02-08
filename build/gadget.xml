@@ -22,11 +22,11 @@ Options.prototype.SORTING = {
 };
 
 Options.prototype.isSingleVariantVoting = function() {
-    return this._options.singleVariantVoting == true;
+    return this._options.singleVariantVoting || false;
 };
 
 Options.prototype.getSortingOrder = function() {
-    return this._options.sorting;
+    return this._options.sorting || this.SORTING.NONE;
 };
 
 Options.prototype._addChangeListener = function() {
@@ -55,6 +55,7 @@ Options.prototype.update = function(options) {
         <script> var Poll = function(viewer, callbacks) {
     this._viewer = viewer;
     this._variants = [];
+    this._positions = [];
     this._node = $('#poll');
     this._callbacks = callbacks;
     this._initOptions();
@@ -82,6 +83,10 @@ Poll.prototype._getVariantById = function(id) {
     return null;
 };
 
+Poll.prototype._getVariantPosition = function(variant) {
+    return $.inArray(variant.getId(), this._positions);
+};
+
 Poll.prototype._isVariantExist = function(name) {
     for (var i in this._variants) {
         var variant = this._variants[i];
@@ -98,13 +103,17 @@ Poll.prototype._getUpdatedVariants = function(name) {
         var variant = this._variants[i];
         updated.push({
             id: variant.getId(),
-            name: variant.getName()
+            name: variant.getName(),
+            position: this._getVariantPosition(variant)
         });
     }
-    updated.push({
-        id: this._variants.length, 
-        name: name
-    });
+    if (name) {
+        updated.push({
+            id: this._variants.length,
+            name: name,
+            position: this._positions.length
+        });
+    }
     return updated;
 };
 
@@ -113,7 +122,7 @@ Poll.prototype._addSubmitListener = function() {
         var text = $(event.target).find(':text');
         var name = text.val().replace(/^\s+|\s+$/, '');
         if (name && !this._isVariantExist(name)) {
-            var variants = this._getUpdatedVariants();
+            var variants = this._getUpdatedVariants(name);
             this._callbacks.onVariant(variants);
         }
         text.focus();
@@ -148,17 +157,29 @@ Poll.prototype._getUpdatedVotes = function() {
     return updated;
 };
 
-Poll.prototype._addVariant = function(id, name) {
+Poll.prototype._addVariant = function(id, name, position) {
     var variant = new Variant(id, name, {
         onVote: $.proxy(function() {
             var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
             var votes = this._getUpdatedVotes();
             this._callbacks.onVote(mode, votes);
+        }, this),
+        onMove: $.proxy(function(delta) {
+            var position = this._getVariantPosition(variant);
+            var newPosition = position + delta;
+            if (newPosition < 0 || newPosition >= this._positions.length) {
+                return;
+            }
+            this._positions[position] = this._positions[newPosition];
+            this._positions[newPosition] = id;
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
         }, this)
     });
     var isExclusive = this._options.isSingleVariantVoting();
     variant.setExclusive(isExclusive);
     this._variants.push(variant);
+    this._positions[position] = id;
     this._node.append(variant.getNode());
 };
 
@@ -174,7 +195,7 @@ Poll.prototype._updateVariants = function(variants) {
     for (var i in variants) {
         var variant = variants[i];
         if (!this._isVariantExist(variant.name)) {
-            this._addVariant(variant.id, variant.name);
+            this._addVariant(variant.id, variant.name, variant.position);
         } else {
             this._getVariantById(variant.id).setExclusive(isExclusive);
         }
@@ -197,9 +218,9 @@ Poll.prototype._updateVotes = function(votes) {
 Poll.prototype._getSortFunction = function() {
     var order = this._options.getSortingOrder();
     if (order == this._options.SORTING.NONE) {
-        return function(a, b) {
-            return a.getId() > b.getId() ? 1 : -1;
-        };
+        return $.proxy(function(a, b) {
+            return this._getVariantPosition(a) > this._getVariantPosition(b) ? 1 : -1;
+        }, this);
     }
     if (order == this._options.SORTING.BY_NAME) {
         return function(a, b) {
@@ -262,8 +283,20 @@ User.prototype.getAvatar = function() {
 };
 
 Variant.prototype._addChangeListener = function() {
-    this._node.on('change', ':checkbox,:radio', $.proxy(function(event) {
+    this._node.on('change', ':checkbox,:radio', $.proxy(function() {
         this._callbacks.onVote();
+    }, this));
+};
+
+Variant.prototype._addClickListener = function() {
+    this._node.on('click', '.variant-control', $.proxy(function(event) {
+        var element = $(event.target);
+        if (element.hasClass('variant-move-up')) {
+            this._callbacks.onMove(-1);
+        }
+        if (element.hasClass('variant-move-down')) {
+            this._callbacks.onMove(1);
+        }
     }, this));
 };
 
@@ -273,12 +306,17 @@ Variant.prototype._createNode = function() {
             <label class="variant-name-container"> \
                 <input type="checkbox" name="variant"><span class="variant-name"></span> \
             </label> \
-            <span class="voter_count"></span> \
-            <span class="voters"></span> \
+            <span class="variant-controls"> \
+                <button class="variant-control variant-move-up" title="Move up"></button> \
+                <button class="variant-control variant-move-down" title="Move down"></button> \
+            </span> \
+            <span class="variant-vote-count"></span> \
+            <span class="variant-voters"></span> \
         </div>'
     );
     this._node.find('.variant-name').text(this._name);
     this._addChangeListener();
+    this._addClickListener();
 };
 
 Variant.prototype.getId = function() {
@@ -306,10 +344,10 @@ Variant.prototype.hasVote = function() {
     return this._node.find(':checkbox,:radio').is(':checked');
 };
 
-Variant.prototype._updateVoterCount = function() {
+Variant.prototype._updateVoteCount = function() {
     var count = this.getVoteCount();
     var text = count ? '(' + count + ')' : '';
-    this._node.find('.voter_count').text(text);
+    this._node.find('.variant-vote-count').text(text);
 };
 
 Variant.prototype.getUserIds = function() {
@@ -332,7 +370,7 @@ Variant.prototype.hasUser = function(userId) {
 
 Variant.prototype.addUser = function(user, isCurrentUser) {
     this._users.push(user);
-    var node = $('<span class="avatar user_' + user.getId() + '"></span>');
+    var node = $('<span class="variant-avatar variant-user-' + user.getId() + '"></span>');
     var name = user.getName();
     if (name) {
         node.attr('title', name);
@@ -341,8 +379,8 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
     if (avatar) {
         node.css('background-image', 'url(' + avatar + ')');
     }
-    this._node.find('.voters').append(node);
-    this._updateVoterCount();
+    this._node.find('.variant-voters').append(node);
+    this._updateVoteCount();
     if (isCurrentUser) {
         this._node.addClass('voted');
         this._node.find(':checkbox,:radio').prop('checked', true);
@@ -359,8 +397,8 @@ Variant.prototype.removeUser = function(userId) {
             break;
         }
     }
-    this._node.find('.voters .user_' + userId).remove();
-    this._updateVoterCount();
+    this._node.find('.variant-voters .variant-user-' + userId).remove();
+    this._updateVoteCount();
 };
 
 Variant.prototype.reset = function() {
@@ -403,7 +441,7 @@ Converter.prototype.state2variants = function(state) {
 };
 
 Converter.prototype.variants2state = function(variants) {
-    return {variants: variants};
+    return {variants: this._serialize(variants)};
 };
 
 Converter.prototype.state2votes = function(state) {
@@ -502,7 +540,12 @@ WaveConnector.prototype.init = function() {
 var connector = new WaveConnector();
 connector.init();
  </script>
-        <style> .variant {
+        <style> * {
+    padding: 0;
+    margin: 0;
+}
+
+.variant {
     height: 35px;
 }
 
@@ -513,17 +556,55 @@ connector.init();
 .variant-name-container {
     display: inline-block;
     line-height: 35px;
-    width: 100px;
+    width: 250px;
 }
 
-.voter_count {
+.variant-name-container input {
+    margin: 4px;
+    vertical-align: middle;
+}
+
+.variant-controls {
+    visibility: hidden;
+}
+
+.variant:hover .variant-controls {
+    visibility: visible;
+}
+
+.variant-control {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    vertical-align: middle;
+    background: no-repeat url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAAUCAYAAAAa2LrXAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB90CCAkTEdmOhDEAAAK4SURBVFjD7Zg9T9tAGMd/oUO85Ta64a0ZA0uYyssHaBIW2GK60SnOJ8hHyAhLcTazFFJRySwxdILN2YJUJHdzthsSyZnSoXLEi18OlAFB/pNPeWT/7n/Pc8/lctPpdMpCL9bSwoKFgQsD37yBYRgShuHcPiqlREr5fgx0LhycC2duHzWbJmbTfLH584z1fV/5fXGxSyrm9b0+fa8/FxPNpollWViW9WwTB4MBh0eHShzOhcPh0SGe5yXGnJ2dsbq2qsRhNk1W11axLEvdQM/zuLm+mY1vrm9SgbJkWRbtdns2brfbT4BSDbwdMAknmRwR9ySc4P9NzrDuzy5SykyOiFtKydXvqwe/5ZLOgb7v0+l0AFj+uAzAMBgCUK/X0XX9WeZdXl6ytb0FQKlUmk0UwO25bG5uKu3FVsdK5XjMbdQNNE1LLPGt7a1Ujsfcbs9FCJGegUEQYJ/YABREAaNuYNQNCqIAgH1iEwSBsnme51HbqQGg6zpuz8XtubPJ13ZqSpmtaVoqRxx3knkAQohUjjju++bFGhiGIfaJzSSckNfy7O3uoWkamqaxt7tHXsszCSfYJ7ZSZ5ZSUtupIaVECMHpj1OEEA+e78eomBjHkcSdpSSOJO7HelDCr7FE0jria9hiPrRarVY0OP91zt2fOwAqlQrFYjF2xYQQ3N7eMh6NGY1HsXEAB98OcJz/HfP4+zHVavVJjK7r6Cs63W6XIAgYDodUK1WlzLnPMR6NU7mz9Jgj2hqSuGNLuPipSF7LU14vz1YhTqVSifJ6mbyWR19JXunKlwpCCBqNBoZhJMYZhkGj0UAIwcbnDeVJRxyRsrizFHFEyuKO7cJRzaseVLNifd9XLqfnxD44z3XPAJQyV0X7X/dn2Zel3Fu4zoqamUrTeM4/GJVEyi3uAxe3MQsDFwa+Y/0DBabH22BQr7QAAAAASUVORK5CYII=);
+    cursor: pointer;
+}
+
+.variant-move-up {
+    background-position: 0 0;
+}
+
+.variant-move-up:hover {
+    background-position: -20px 0;
+}
+
+.variant-move-down {
+    background-position: -40px 0;
+}
+
+.variant-move-down:hover {
+    background-position: -60px 0;
+}
+
+.variant-vote-count {
     display: inline-block;
     line-height: 35px;
     width: 40px;
     text-align: right;
 }
 
-.avatar {
+.variant-avatar {
     display: inline-block;
     width: 30px;
     height: 30px;
@@ -533,8 +614,21 @@ connector.init();
     vertical-align: middle;
 }
 
+#add-variant {
+    padding: 4px;
+}
+
+#add-variant input {
+    padding: 4px;
+}
+
 #options label {
     display: block;
+    padding: 4px;
+}
+
+#options input {
+    vertical-align: middle;
 }
  </style>
     </head>
