@@ -6,6 +6,11 @@ var Poll = function(viewer, callbacks) {
     this._initOptions();
 };
 
+Poll.prototype.MODES = {
+    SINGLE: 0,
+    MULTI: 1
+};
+
 Poll.prototype._initOptions = function() {
     this._options = new Options({
         onChange: this._callbacks.onOptionsChange
@@ -33,12 +38,29 @@ Poll.prototype._isVariantExist = function(name) {
     return false;
 };
 
+Poll.prototype._getUpdatedVariants = function(name) {
+    var updated = [];
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        updated.push({
+            id: variant.getId(),
+            name: variant.getName()
+        });
+    }
+    updated.push({
+        id: this._variants.length, 
+        name: name
+    });
+    return updated;
+};
+
 Poll.prototype._addSubmitListener = function() {
     $('#add-variant').submit($.proxy(function(event) {
         var text = $(event.target).find(':text');
         var name = text.val().replace(/^\s+|\s+$/, '');
         if (name && !this._isVariantExist(name)) {
-            this._callbacks.onNewVariant(this._variants.length, name);
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
         }
         text.focus();
         text.select();
@@ -50,22 +72,34 @@ Poll.prototype.init = function() {
     this._addSubmitListener();
 };
 
-Poll.prototype._getVotedVariants = function() {
-    var voted = [];
+Poll.prototype._getUpdatedVotes = function() {
+    var updated = {};
+    var viewerId = this._viewer.getId();
     for (var i in this._variants) {
         var variant = this._variants[i];
+        var userIds = variant.getUserIds();
+        var position = $.inArray(viewerId, userIds);
         if (variant.hasVote()) {
-            voted.push(variant.getId());
+            if (position == -1) {
+                userIds.push(viewerId);
+            }
+        } else {
+            if (position != -1) {
+                userIds.splice(position, 1);
+            }
         }
+        var variantId = variant.getId();
+        updated[variantId] = userIds;
     }
-    return voted;
+    return updated;
 };
 
 Poll.prototype._addVariant = function(id, name) {
     var variant = new Variant(id, name, {
         onVote: $.proxy(function() {
-            var voted = this._getVotedVariants();
-            this._callbacks.onVote(this._viewer.getId(), voted, this._options.isSingleVariantVoting());
+            var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
+            var votes = this._getUpdatedVotes();
+            this._callbacks.onVote(mode, votes);
         }, this)
     });
     var isExclusive = this._options.isSingleVariantVoting();
@@ -94,7 +128,7 @@ Poll.prototype._updateVariants = function(variants) {
 };
 
 Poll.prototype._updateVotes = function(votes) {
-    var mode = this._options.isSingleVariantVoting();
+    var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
     var modeVotes = votes[mode] || {};
     for (var variantId in modeVotes) {
         var variant = this._getVariantById(variantId);

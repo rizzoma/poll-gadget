@@ -26,7 +26,7 @@ Converter.prototype.state2variants = function(state) {
 };
 
 Converter.prototype.variants2state = function(variants) {
-    return {variants: this._serialize(variants)};
+    return {variants: variants};
 };
 
 Converter.prototype.state2votes = function(state) {
@@ -38,28 +38,31 @@ Converter.prototype.state2votes = function(state) {
             continue;
         }
         var parts = key.split('|');
-        var userId = parts[1];
-        var mode = Boolean(Number(parts[2]));
-        var user = this.participant2user(wave.getParticipantById(userId));
-        var variants = this._unserialize(state.get(key));
-        for (var j in variants) {
-            var variant = variants[j];
+        var mode = parts[1];
+        var variantId = parts[2];
+        var userIds = this._unserialize(state.get(key));
+        for (var j in userIds) {
+            var userId = userIds[j];
+            var user = this.participant2user(wave.getParticipantById(userId));
             if (!(mode in votes)) {
                 votes[mode] = {};
             }
             var modeVotes = votes[mode];
-            if (!(variant in modeVotes)) {
-                modeVotes[variant] = [];
+            if (!(variantId in modeVotes)) {
+                modeVotes[variantId] = [];
             }
-            modeVotes[variant].push(user); 
+            modeVotes[variantId].push(user); 
         }
     }
     return votes;
 };
 
-Converter.prototype.votes2state = function(userId, variants, mode) {
+Converter.prototype.votes2state = function(mode, votes) {
     var delta = {};
-    delta['votes|' + userId + '|' + Number(mode)] = this._serialize(variants);
+    for (var variantId in votes) {
+        var key = 'votes|' + mode + '|' + variantId;
+        delta[key] = this._serialize(votes[variantId]);
+    }
     return delta;
 };
 
@@ -79,17 +82,15 @@ var WaveConnector = function() {
     this._converter = new Converter();
 };
 
-WaveConnector.prototype._onNewVariant = function(id, name) {
+WaveConnector.prototype._onVariant = function(variants) {
     var state = wave.getState();
-    var variants = this._converter.state2variants(state);
-    variants.push({id: id, name: name});
     var delta = this._converter.variants2state(variants);
     state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onVote = function(userId, variants, mode) {
+WaveConnector.prototype._onVote = function(mode, votes) {
     var state = wave.getState();
-    var delta = this._converter.votes2state(userId, variants, mode);
+    var delta = this._converter.votes2state(mode, votes);
     state.submitDelta(delta);
 };
 
@@ -102,7 +103,7 @@ WaveConnector.prototype._onOptionsChange = function(options) {
 WaveConnector.prototype._onLoad = function() {
     var viewer = this._converter.participant2user(wave.getViewer());
     var poll = new Poll(viewer, {
-        onNewVariant: $.proxy(this._onNewVariant, this),
+        onVariant: $.proxy(this._onVariant, this),
         onVote: $.proxy(this._onVote, this),
         onOptionsChange: $.proxy(this._onOptionsChange, this)
     });

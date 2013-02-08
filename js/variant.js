@@ -57,6 +57,24 @@ Variant.prototype._updateVoterCount = function() {
     this._node.find('.voter_count').text(text);
 };
 
+Variant.prototype.getUserIds = function() {
+    var ids = [];
+    for (var i in this._users) {
+        var user = this._users[i];
+        ids.push(user.getId());
+    }
+    return ids;
+};
+
+Variant.prototype.hasUser = function(userId) {
+    for (var i in this._users) {
+        if (this._users[i].getId() == userId) {
+            return true;
+        }
+    }
+    return false;
+};
+
 Variant.prototype.addUser = function(user, isCurrentUser) {
     this._users.push(user);
     var node = $('<span class="avatar user_' + user.getId() + '"></span>');
@@ -88,15 +106,6 @@ Variant.prototype.removeUser = function(userId) {
     }
     this._node.find('.voters .user_' + userId).remove();
     this._updateVoterCount();
-};
-
-Variant.prototype.hasUser = function(userId) {
-    for (var i in this._users) {
-        if (this._users[i].getId() == userId) {
-            return true;
-        }
-    }
-    return false;
 };
 
 Variant.prototype.reset = function() {
