@@ -159,6 +159,10 @@ Poll.prototype._getUpdatedVotes = function() {
 
 Poll.prototype._addVariant = function(id, name, position) {
     var variant = new Variant(id, name, {
+        onEdit: $.proxy(function() {
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
+        }, this),
         onVote: $.proxy(function() {
             var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
             var votes = this._getUpdatedVotes();
@@ -193,11 +197,13 @@ Poll.prototype._updateVariants = function(variants) {
     }
     var isExclusive = this._options.isSingleVariantVoting();
     for (var i in variants) {
-        var variant = variants[i];
-        if (!this._isVariantExist(variant.name)) {
-            this._addVariant(variant.id, variant.name, variant.position);
+        var info = variants[i];
+        if (!this._isVariantExist(info.name)) {
+            this._addVariant(info.id, info.name, info.position);
         } else {
-            this._getVariantById(variant.id).setExclusive(isExclusive);
+            var variant = this._getVariantById(info.id);
+            variant.setName(info.name);
+            variant.setExclusive(isExclusive);
         }
     }
 };
@@ -235,6 +241,7 @@ Poll.prototype._getSortFunction = function() {
             return a.getVoteCount() > b.getVoteCount() ? -1 : 1;
         };
     }
+    return null;
 };
 
 Poll.prototype._sortVariants = function() {
@@ -288,6 +295,28 @@ Variant.prototype._addChangeListener = function() {
     }, this));
 };
 
+Variant.prototype._showNameEditor = function() {
+    var input = $('<input type="text">');
+    input.val(this._name);
+    input.click(function() {
+        return false;
+    });
+    var callback = $.proxy(function() {
+        this._name = input.val();
+        this._callbacks.onEdit();
+    }, this);
+    input.keydown($.proxy(function(event) {
+        if (event.which == 10 || event.which == 13) {
+            callback();
+        }
+    }, this));
+    input.blur($.proxy(function() {
+        callback();
+    }, this));
+    this._node.find('.variant-name').empty().append(input);
+    input.focus();
+};
+
 Variant.prototype._addClickListener = function() {
     this._node.on('click', '.variant-control', $.proxy(function(event) {
         var element = $(event.target);
@@ -296,6 +325,9 @@ Variant.prototype._addClickListener = function() {
         }
         if (element.hasClass('variant-move-down')) {
             this._callbacks.onMove(1);
+        }
+        if (element.hasClass('variant-edit')) {
+            this._showNameEditor();
         }
     }, this));
 };
@@ -309,6 +341,7 @@ Variant.prototype._createNode = function() {
             <span class="variant-controls"> \
                 <button class="variant-control variant-move-up" title="Move up"></button> \
                 <button class="variant-control variant-move-down" title="Move down"></button> \
+                <button class="variant-control variant-edit" title="Edit title"></button> \
             </span> \
             <span class="variant-vote-count"></span> \
             <span class="variant-voters"></span> \
@@ -325,6 +358,11 @@ Variant.prototype.getId = function() {
 
 Variant.prototype.getName = function() {
     return this._name;
+};
+
+Variant.prototype.setName = function(name) {
+    this._name = name;
+    this._node.find('.variant-name').text(name);
 };
 
 Variant.prototype.getNode = function() {
@@ -385,9 +423,12 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
         this._node.addClass('voted');
         this._node.find(':checkbox,:radio').prop('checked', true);
     }
+    if (this._users.length > 1 || !isCurrentUser) {
+        this._node.find('.variant-edit').addClass('disabled');
+    }
 };
 
-Variant.prototype.removeUser = function(userId) {
+Variant.prototype._removeUser = function(userId) {
     if (!this.hasUser(userId)) {
         return;
     }
@@ -399,6 +440,7 @@ Variant.prototype.removeUser = function(userId) {
     }
     this._node.find('.variant-voters .variant-user-' + userId).remove();
     this._updateVoteCount();
+    
 };
 
 Variant.prototype.reset = function() {
@@ -407,10 +449,11 @@ Variant.prototype.reset = function() {
         ids.push(this._users[i].getId());
     }
     for (var i in ids) {
-        this.removeUser(ids[i]);
+        this._removeUser(ids[i]);
     }
     this._node.removeClass('voted');
     this._node.find(':checkbox,:radio').prop('checked', false);
+    this._node.find('.variant-edit').removeClass('disabled');
 };
  </script>
         <script> var Converter = function() {
@@ -549,17 +592,18 @@ connector.init();
     height: 35px;
 }
 
-.variant.voted {
-    background: lightgreen;
-}
-
 .variant-name-container {
     display: inline-block;
     line-height: 35px;
     width: 250px;
 }
 
+.variant.voted .variant-name-container {
+    background: lightgreen;
+}
+
 .variant-name-container input {
+    padding: 4px;
     margin: 4px;
     vertical-align: middle;
 }
@@ -577,8 +621,12 @@ connector.init();
     height: 20px;
     border: 0;
     vertical-align: middle;
-    background: no-repeat url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAAAUCAYAAAAa2LrXAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB90CCAkTEdmOhDEAAAK4SURBVFjD7Zg9T9tAGMd/oUO85Ta64a0ZA0uYyssHaBIW2GK60SnOJ8hHyAhLcTazFFJRySwxdILN2YJUJHdzthsSyZnSoXLEi18OlAFB/pNPeWT/7n/Pc8/lctPpdMpCL9bSwoKFgQsD37yBYRgShuHcPiqlREr5fgx0LhycC2duHzWbJmbTfLH584z1fV/5fXGxSyrm9b0+fa8/FxPNpollWViW9WwTB4MBh0eHShzOhcPh0SGe5yXGnJ2dsbq2qsRhNk1W11axLEvdQM/zuLm+mY1vrm9SgbJkWRbtdns2brfbT4BSDbwdMAknmRwR9ySc4P9NzrDuzy5SykyOiFtKydXvqwe/5ZLOgb7v0+l0AFj+uAzAMBgCUK/X0XX9WeZdXl6ytb0FQKlUmk0UwO25bG5uKu3FVsdK5XjMbdQNNE1LLPGt7a1Ujsfcbs9FCJGegUEQYJ/YABREAaNuYNQNCqIAgH1iEwSBsnme51HbqQGg6zpuz8XtubPJ13ZqSpmtaVoqRxx3knkAQohUjjju++bFGhiGIfaJzSSckNfy7O3uoWkamqaxt7tHXsszCSfYJ7ZSZ5ZSUtupIaVECMHpj1OEEA+e78eomBjHkcSdpSSOJO7HelDCr7FE0jria9hiPrRarVY0OP91zt2fOwAqlQrFYjF2xYQQ3N7eMh6NGY1HsXEAB98OcJz/HfP4+zHVavVJjK7r6Cs63W6XIAgYDodUK1WlzLnPMR6NU7mz9Jgj2hqSuGNLuPipSF7LU14vz1YhTqVSifJ6mbyWR19JXunKlwpCCBqNBoZhJMYZhkGj0UAIwcbnDeVJRxyRsrizFHFEyuKO7cJRzaseVLNifd9XLqfnxD44z3XPAJQyV0X7X/dn2Zel3Fu4zoqamUrTeM4/GJVEyi3uAxe3MQsDFwa+Y/0DBabH22BQr7QAAAAASUVORK5CYII=);
+    background: no-repeat url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAAUCAYAAABGUvnzAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB90CCAkbNFpT2n4AAAVQSURBVGje7ZlNTFNZFMd/zkzymmheGxOgi0KayIpuikMiJiYUFxZmYcVQYceHMn7MxhaTcSXEPS2bMSaOUiKTFEpGSpykZSFlNpSMjl0IYRJJaqhJSV2UFzXvLQyzYPqE2o/XloVhela9fffd/t/53XPePadHdnZ2dqjaobVvqi6oAq5aFXDVtJqiKExNPcbr9bC2tlrxepIk0dlpp6HBRCAw88X1I1rewbIsA6DT6Q7kIdPpNAAGg+F/B3hq6jGpVEod2+12mposZa/X2WlndfXzRhkb8+B0XiotgkPhEKFw6MAe0uV24XK7KtocBzU3Ho9rXq+UubkiNxwOfwEzHA6XFcmSJDE87Ka727nv++Fh975I/nZ0dHS0GNwXz1+wldxCVmQaGxsrhnv//n1isRjb29t02Ds037u+vs7Ub1O8//C+qI5QOMTTP55y7NgxjEZjzjlzc3N0/tDJ1tZWUR0ut4vr169jrDNitVpLhhsIzPDx4weam09y/Phx3rz5vFk2NjY4ceIER48e1Qy3p8dJKpVicPAKjY2NLC1F1OsLC2HOnbNTW1tbOIJjsRgr0RV1vBJdIRaLlQ3X5/MxPj6ujsfHx/H5fNoB/7OOIitFdWR0K7JC/E3+qAvOB0mn00V1ZHSn02mW/lwqCy6AzdbO7GyAtbVV2tps6hxBENDr9SXBBbhzZ5SeHiezswFGRj7HqSiK1NfXF07R8XicYDAIQJ2xjjpj3a5TgsGyUlUkEmFgcAAAq9WqRsHA4ACRSETTGh32jqI6snUXikyvx1tUR7Zur8dbNtz5+SCKoiBJEiaTibY2G4Ig0N3tRBCEkuEODV1GkiQ2NzdpbT3NyMgooigyPR1AFMX8gJPJJP5pPwB6g57+vn76+/rRG3Z3mX/aTzKZ1PygsViMrotdAJjNZhafLbL4bBGz2QxA18UuTZlBp9MV1JFLd6GDocFgKKgjl26tB8N8cAVB4Px5BwsLYVKpFDdu/ERtbW3ZcEVR5MGDh9y65WZtbY1Xr9awWCz5D1myLOOf9qPICoJOoLenF51Oh06no7enF0EnoMgK/mm/eroudtDputhFOp3GYDDw5PcnGAyGfZ/3ztECOZeOfLqLWT4d+XQfBNxIZPG/a7ay0nI23Lt3d9Pz3jSds0ySZRnfpI+t5BYAfX196u7emwInJyfVFFgoStLpNO1n29WoWHy2+MVDRSIR2s+2qylQa5Rk6wAK6tbyCtmrIxPB+XRXCtfpvFRRWs6Guzct5210hMIh1UkOhyOnk8xmMw6HQ3VoofLJ5XapTpp4NJHTSTabjYlHE6pDtZZP2TqK6S5m2TqK6c5nL1/+TSqVoqnJUjFcgIcPf2V1dZXubmfJcHOWSa83XtPS0sKZM2fy/qjRaERWZN69e0fL9y15yxB2duu8a9eucfvn23nXs1qtbG9vs76+ztUfr2ouQzI63ibeAnCq9VRB3cUsoyMajQJw8+bNgrqzLRpdRhRFBEHH8+d/8enTp4rger0eTCYTer2ee/d+QVGUkuDm7GRl3jlaGwnF5sbjcc0RVcrcffVscA6AC44LB9KIyZyaMxGt1ebn59nYeI3dbmdzM6GWQ5lGRilwAYaGrhAOhxgb8xCNRgkEZhgZGWV2NqAJruZW5dduX0srNRCYIZFIqC3IDOSampqS4QL09DhZXl5WW5AZyBaLRRPcQwP4azGv17NvbLfbkSSJ5uaTJcMFaGgw7RuPjXlIJBJcvnxFE1yA76pYDtYEQaCmpgZR1CNJEq2tpytaTxRFLBYLJlM9iUQCl8td0v3VCD7kVv0/+JDbv2LRNaSUD0SwAAAAAElFTkSuQmCC);
     cursor: pointer;
+}
+
+.variant-control.disabled {
+    visibility: hidden;
 }
 
 .variant-move-up {
@@ -595,6 +643,14 @@ connector.init();
 
 .variant-move-down:hover {
     background-position: -60px 0;
+}
+
+.variant-edit {
+    background-position: -80px 0;
+}
+
+.variant-edit:hover {
+    background-position: -100px 0;
 }
 
 .variant-vote-count {

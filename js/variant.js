@@ -12,6 +12,28 @@ Variant.prototype._addChangeListener = function() {
     }, this));
 };
 
+Variant.prototype._showNameEditor = function() {
+    var input = $('<input type="text">');
+    input.val(this._name);
+    input.click(function() {
+        return false;
+    });
+    var callback = $.proxy(function() {
+        this._name = input.val();
+        this._callbacks.onEdit();
+    }, this);
+    input.keydown($.proxy(function(event) {
+        if (event.which == 10 || event.which == 13) {
+            callback();
+        }
+    }, this));
+    input.blur($.proxy(function() {
+        callback();
+    }, this));
+    this._node.find('.variant-name').empty().append(input);
+    input.focus();
+};
+
 Variant.prototype._addClickListener = function() {
     this._node.on('click', '.variant-control', $.proxy(function(event) {
         var element = $(event.target);
@@ -20,6 +42,9 @@ Variant.prototype._addClickListener = function() {
         }
         if (element.hasClass('variant-move-down')) {
             this._callbacks.onMove(1);
+        }
+        if (element.hasClass('variant-edit')) {
+            this._showNameEditor();
         }
     }, this));
 };
@@ -33,6 +58,7 @@ Variant.prototype._createNode = function() {
             <span class="variant-controls"> \
                 <button class="variant-control variant-move-up" title="Move up"></button> \
                 <button class="variant-control variant-move-down" title="Move down"></button> \
+                <button class="variant-control variant-edit" title="Edit title"></button> \
             </span> \
             <span class="variant-vote-count"></span> \
             <span class="variant-voters"></span> \
@@ -49,6 +75,11 @@ Variant.prototype.getId = function() {
 
 Variant.prototype.getName = function() {
     return this._name;
+};
+
+Variant.prototype.setName = function(name) {
+    this._name = name;
+    this._node.find('.variant-name').text(name);
 };
 
 Variant.prototype.getNode = function() {
@@ -109,9 +140,12 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
         this._node.addClass('voted');
         this._node.find(':checkbox,:radio').prop('checked', true);
     }
+    if (this._users.length > 1 || !isCurrentUser) {
+        this._node.find('.variant-edit').addClass('disabled');
+    }
 };
 
-Variant.prototype.removeUser = function(userId) {
+Variant.prototype._removeUser = function(userId) {
     if (!this.hasUser(userId)) {
         return;
     }
@@ -123,6 +157,7 @@ Variant.prototype.removeUser = function(userId) {
     }
     this._node.find('.variant-voters .variant-user-' + userId).remove();
     this._updateVoteCount();
+    
 };
 
 Variant.prototype.reset = function() {
@@ -131,8 +166,9 @@ Variant.prototype.reset = function() {
         ids.push(this._users[i].getId());
     }
     for (var i in ids) {
-        this.removeUser(ids[i]);
+        this._removeUser(ids[i]);
     }
     this._node.removeClass('voted');
     this._node.find(':checkbox,:radio').prop('checked', false);
+    this._node.find('.variant-edit').removeClass('disabled');
 };

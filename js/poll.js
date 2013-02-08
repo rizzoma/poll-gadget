@@ -105,6 +105,10 @@ Poll.prototype._getUpdatedVotes = function() {
 
 Poll.prototype._addVariant = function(id, name, position) {
     var variant = new Variant(id, name, {
+        onEdit: $.proxy(function() {
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
+        }, this),
         onVote: $.proxy(function() {
             var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
             var votes = this._getUpdatedVotes();
@@ -139,11 +143,13 @@ Poll.prototype._updateVariants = function(variants) {
     }
     var isExclusive = this._options.isSingleVariantVoting();
     for (var i in variants) {
-        var variant = variants[i];
-        if (!this._isVariantExist(variant.name)) {
-            this._addVariant(variant.id, variant.name, variant.position);
+        var info = variants[i];
+        if (!this._isVariantExist(info.name)) {
+            this._addVariant(info.id, info.name, info.position);
         } else {
-            this._getVariantById(variant.id).setExclusive(isExclusive);
+            var variant = this._getVariantById(info.id);
+            variant.setName(info.name);
+            variant.setExclusive(isExclusive);
         }
     }
 };
@@ -181,6 +187,7 @@ Poll.prototype._getSortFunction = function() {
             return a.getVoteCount() > b.getVoteCount() ? -1 : 1;
         };
     }
+    return null;
 };
 
 Poll.prototype._sortVariants = function() {

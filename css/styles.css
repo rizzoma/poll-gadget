@@ -7,17 +7,18 @@
     height: 35px;
 }
 
-.variant.voted {
-    background: lightgreen;
-}
-
 .variant-name-container {
     display: inline-block;
     line-height: 35px;
     width: 250px;
 }
 
+.variant.voted .variant-name-container {
+    background: lightgreen;
+}
+
 .variant-name-container input {
+    padding: 4px;
     margin: 4px;
     vertical-align: middle;
 }
@@ -39,6 +40,10 @@
     cursor: pointer;
 }
 
+.variant-control.disabled {
+    visibility: hidden;
+}
+
 .variant-move-up {
     background-position: 0 0;
 }
@@ -53,6 +58,14 @@
 
 .variant-move-down:hover {
     background-position: -60px 0;
+}
+
+.variant-edit {
+    background-position: -80px 0;
+}
+
+.variant-edit:hover {
+    background-position: -100px 0;
 }
 
 .variant-vote-count {
