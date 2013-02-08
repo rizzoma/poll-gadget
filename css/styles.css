@@ -3,6 +3,19 @@
     margin: 0;
 }
 
+.button {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    vertical-align: middle;
+    background: no-repeat url(data:image/png;base64,%% img/icons.png base64 %%);
+    cursor: pointer;
+}
+
+.button.disabled {
+    visibility: hidden;
+}
+
 .variant {
     height: 35px;
 }
@@ -29,19 +42,6 @@
 
 .variant:hover .variant-controls {
     visibility: visible;
-}
-
-.variant-control {
-    width: 20px;
-    height: 20px;
-    border: 0;
-    vertical-align: middle;
-    background: no-repeat url(data:image/png;base64,%% img/icons.png base64 %%);
-    cursor: pointer;
-}
-
-.variant-control.disabled {
-    visibility: hidden;
 }
 
 .variant-move-up {
@@ -91,6 +91,18 @@
 
 #add-variant input {
     padding: 4px;
+}
+
+.toggle-options {
+    background-position: -120px;
+}
+
+.toggle-options:hover {
+    background-position: -140px;
+}
+
+#options {
+    display: none;
 }
 
 #options label {

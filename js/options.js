@@ -18,6 +18,13 @@ Options.prototype.getSortingOrder = function() {
     return this._options.sorting || this.SORTING.NONE;
 };
 
+Options.prototype._addClickListener = function() {
+    $('.toggle-options').click($.proxy(function() {
+        this._node.toggle();
+        this._callbacks.onResize();
+    }, this));
+};
+
 Options.prototype._addChangeListener = function() {
     this._node.on('change', ':checkbox,select', $.proxy(function(event) {
         var options = $.extend({}, this._options);
@@ -34,6 +41,7 @@ Options.prototype._addChangeListener = function() {
 };
 
 Options.prototype.init = function() {
+    this._addClickListener();
     this._addChangeListener();
 };
 

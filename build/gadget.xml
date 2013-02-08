@@ -29,6 +29,13 @@ Options.prototype.getSortingOrder = function() {
     return this._options.sorting || this.SORTING.NONE;
 };
 
+Options.prototype._addClickListener = function() {
+    $('.toggle-options').click($.proxy(function() {
+        this._node.toggle();
+        this._callbacks.onResize();
+    }, this));
+};
+
 Options.prototype._addChangeListener = function() {
     this._node.on('change', ':checkbox,select', $.proxy(function(event) {
         var options = $.extend({}, this._options);
@@ -45,6 +52,7 @@ Options.prototype._addChangeListener = function() {
 };
 
 Options.prototype.init = function() {
+    this._addClickListener();
     this._addChangeListener();
 };
 
@@ -68,7 +76,8 @@ Poll.prototype.MODES = {
 
 Poll.prototype._initOptions = function() {
     this._options = new Options({
-        onChange: this._callbacks.onOptionsChange
+        onChange: this._callbacks.onOptions,
+        onResize: this._callbacks.onResize
     });
     this._options.init();
 };
@@ -261,6 +270,7 @@ Poll.prototype.updateState = function(state) {
     this._updateVariants(state.variants);
     this._updateVotes(state.votes);
     this._sortVariants();
+    this._callbacks.onResize();
 };
  </script>
         <script> var User = function(id, name, avatar) {
@@ -318,7 +328,7 @@ Variant.prototype._showNameEditor = function() {
 };
 
 Variant.prototype._addClickListener = function() {
-    this._node.on('click', '.variant-control', $.proxy(function(event) {
+    this._node.on('click', '.button', $.proxy(function(event) {
         var element = $(event.target);
         if (element.hasClass('variant-move-up')) {
             this._callbacks.onMove(-1);
@@ -339,9 +349,9 @@ Variant.prototype._createNode = function() {
                 <input type="checkbox" name="variant"><span class="variant-name"></span> \
             </label> \
             <span class="variant-controls"> \
-                <button class="variant-control variant-move-up" title="Move up"></button> \
-                <button class="variant-control variant-move-down" title="Move down"></button> \
-                <button class="variant-control variant-edit" title="Edit title"></button> \
+                <button class="button variant-move-up" title="Move up"></button> \
+                <button class="button variant-move-down" title="Move down"></button> \
+                <button class="button variant-edit" title="Edit title"></button> \
             </span> \
             <span class="variant-vote-count"></span> \
             <span class="variant-voters"></span> \
@@ -552,7 +562,7 @@ WaveConnector.prototype._onVote = function(mode, votes) {
     state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onOptionsChange = function(options) {
+WaveConnector.prototype._onOptions = function(options) {
     var state = wave.getState();
     var delta = this._converter.options2state(options)
     state.submitDelta(delta);
@@ -563,7 +573,10 @@ WaveConnector.prototype._onLoad = function() {
     var poll = new Poll(viewer, {
         onVariant: $.proxy(this._onVariant, this),
         onVote: $.proxy(this._onVote, this),
-        onOptionsChange: $.proxy(this._onOptionsChange, this)
+        onOptions: $.proxy(this._onOptions, this),
+        onResize: function() {
+            gadgets.window.adjustHeight();
+        }
     });
     wave.setStateCallback($.proxy(function() {
         var state = wave.getState();
@@ -586,6 +599,19 @@ connector.init();
         <style> * {
     padding: 0;
     margin: 0;
+}
+
+.button {
+    width: 20px;
+    height: 20px;
+    border: 0;
+    vertical-align: middle;
+    background: no-repeat url(data:image/png;base64,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);
+    cursor: pointer;
+}
+
+.button.disabled {
+    visibility: hidden;
 }
 
 .variant {
@@ -614,19 +640,6 @@ connector.init();
 
 .variant:hover .variant-controls {
     visibility: visible;
-}
-
-.variant-control {
-    width: 20px;
-    height: 20px;
-    border: 0;
-    vertical-align: middle;
-    background: no-repeat url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAAUCAYAAABGUvnzAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB90CCAkbNFpT2n4AAAVQSURBVGje7ZlNTFNZFMd/zkzymmheGxOgi0KayIpuikMiJiYUFxZmYcVQYceHMn7MxhaTcSXEPS2bMSaOUiKTFEpGSpykZSFlNpSMjl0IYRJJaqhJSV2UFzXvLQyzYPqE2o/XloVhela9fffd/t/53XPePadHdnZ2dqjaobVvqi6oAq5aFXDVtJqiKExNPcbr9bC2tlrxepIk0dlpp6HBRCAw88X1I1rewbIsA6DT6Q7kIdPpNAAGg+F/B3hq6jGpVEod2+12mposZa/X2WlndfXzRhkb8+B0XiotgkPhEKFw6MAe0uV24XK7KtocBzU3Ho9rXq+UubkiNxwOfwEzHA6XFcmSJDE87Ka727nv++Fh975I/nZ0dHS0GNwXz1+wldxCVmQaGxsrhnv//n1isRjb29t02Ds037u+vs7Ub1O8//C+qI5QOMTTP55y7NgxjEZjzjlzc3N0/tDJ1tZWUR0ut4vr169jrDNitVpLhhsIzPDx4weam09y/Phx3rz5vFk2NjY4ceIER48e1Qy3p8dJKpVicPAKjY2NLC1F1OsLC2HOnbNTW1tbOIJjsRgr0RV1vBJdIRaLlQ3X5/MxPj6ujsfHx/H5fNoB/7OOIitFdWR0K7JC/E3+qAvOB0mn00V1ZHSn02mW/lwqCy6AzdbO7GyAtbVV2tps6hxBENDr9SXBBbhzZ5SeHiezswFGRj7HqSiK1NfXF07R8XicYDAIQJ2xjjpj3a5TgsGyUlUkEmFgcAAAq9WqRsHA4ACRSETTGh32jqI6snUXikyvx1tUR7Zur8dbNtz5+SCKoiBJEiaTibY2G4Ig0N3tRBCEkuEODV1GkiQ2NzdpbT3NyMgooigyPR1AFMX8gJPJJP5pPwB6g57+vn76+/rRG3Z3mX/aTzKZ1PygsViMrotdAJjNZhafLbL4bBGz2QxA18UuTZlBp9MV1JFLd6GDocFgKKgjl26tB8N8cAVB4Px5BwsLYVKpFDdu/ERtbW3ZcEVR5MGDh9y65WZtbY1Xr9awWCz5D1myLOOf9qPICoJOoLenF51Oh06no7enF0EnoMgK/mm/eroudtDputhFOp3GYDDw5PcnGAyGfZ/3ztECOZeOfLqLWT4d+XQfBNxIZPG/a7ay0nI23Lt3d9Pz3jSds0ySZRnfpI+t5BYAfX196u7emwInJyfVFFgoStLpNO1n29WoWHy2+MVDRSIR2s+2qylQa5Rk6wAK6tbyCtmrIxPB+XRXCtfpvFRRWs6Guzct5210hMIh1UkOhyOnk8xmMw6HQ3VoofLJ5XapTpp4NJHTSTabjYlHE6pDtZZP2TqK6S5m2TqK6c5nL1/+TSqVoqnJUjFcgIcPf2V1dZXubmfJcHOWSa83XtPS0sKZM2fy/qjRaERWZN69e0fL9y15yxB2duu8a9eucfvn23nXs1qtbG9vs76+ztUfr2ouQzI63ibeAnCq9VRB3cUsoyMajQJw8+bNgrqzLRpdRhRFBEHH8+d/8enTp4rger0eTCYTer2ee/d+QVGUkuDm7GRl3jlaGwnF5sbjcc0RVcrcffVscA6AC44LB9KIyZyaMxGt1ebn59nYeI3dbmdzM6GWQ5lGRilwAYaGrhAOhxgb8xCNRgkEZhgZGWV2NqAJruZW5dduX0srNRCYIZFIqC3IDOSampqS4QL09DhZXl5WW5AZyBaLRRPcQwP4azGv17NvbLfbkSSJ5uaTJcMFaGgw7RuPjXlIJBJcvnxFE1yA76pYDtYEQaCmpgZR1CNJEq2tpytaTxRFLBYLJlM9iUQCl8td0v3VCD7kVv0/+JDbv2LRNaSUD0SwAAAAAElFTkSuQmCC);
-    cursor: pointer;
-}
-
-.variant-control.disabled {
-    visibility: hidden;
 }
 
 .variant-move-up {
@@ -678,6 +691,18 @@ connector.init();
     padding: 4px;
 }
 
+.toggle-options {
+    background-position: -120px;
+}
+
+.toggle-options:hover {
+    background-position: -140px;
+}
+
+#options {
+    display: none;
+}
+
 #options label {
     display: block;
     padding: 4px;
@@ -692,7 +717,8 @@ connector.init();
         <div id="poll"></div>
         <form id="add-variant" action="">
             <input type="text" placeholder="Add a new variant">
-            <input type="submit" value="Add">
+            <input type="submit" value="Add (Enter)">
+            <button class="button toggle-options" title="Toggle options"></button>
         </form>
         <div id="options">
             <label><input type="checkbox" name="singleVariantVoting"> Single variant voting</label>

@@ -35,7 +35,7 @@ Variant.prototype._showNameEditor = function() {
 };
 
 Variant.prototype._addClickListener = function() {
-    this._node.on('click', '.variant-control', $.proxy(function(event) {
+    this._node.on('click', '.button', $.proxy(function(event) {
         var element = $(event.target);
         if (element.hasClass('variant-move-up')) {
             this._callbacks.onMove(-1);
@@ -56,9 +56,9 @@ Variant.prototype._createNode = function() {
                 <input type="checkbox" name="variant"><span class="variant-name"></span> \
             </label> \
             <span class="variant-controls"> \
-                <button class="variant-control variant-move-up" title="Move up"></button> \
-                <button class="variant-control variant-move-down" title="Move down"></button> \
-                <button class="variant-control variant-edit" title="Edit title"></button> \
+                <button class="button variant-move-up" title="Move up"></button> \
+                <button class="button variant-move-down" title="Move down"></button> \
+                <button class="button variant-edit" title="Edit title"></button> \
             </span> \
             <span class="variant-vote-count"></span> \
             <span class="variant-voters"></span> \

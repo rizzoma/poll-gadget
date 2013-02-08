@@ -94,7 +94,7 @@ WaveConnector.prototype._onVote = function(mode, votes) {
     state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onOptionsChange = function(options) {
+WaveConnector.prototype._onOptions = function(options) {
     var state = wave.getState();
     var delta = this._converter.options2state(options)
     state.submitDelta(delta);
@@ -105,7 +105,10 @@ WaveConnector.prototype._onLoad = function() {
     var poll = new Poll(viewer, {
         onVariant: $.proxy(this._onVariant, this),
         onVote: $.proxy(this._onVote, this),
-        onOptionsChange: $.proxy(this._onOptionsChange, this)
+        onOptions: $.proxy(this._onOptions, this),
+        onResize: function() {
+            gadgets.window.adjustHeight();
+        }
     });
     wave.setStateCallback($.proxy(function() {
         var state = wave.getState();

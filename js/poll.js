@@ -14,7 +14,8 @@ Poll.prototype.MODES = {
 
 Poll.prototype._initOptions = function() {
     this._options = new Options({
-        onChange: this._callbacks.onOptionsChange
+        onChange: this._callbacks.onOptions,
+        onResize: this._callbacks.onResize
     });
     this._options.init();
 };
@@ -207,4 +208,5 @@ Poll.prototype.updateState = function(state) {
     this._updateVariants(state.variants);
     this._updateVotes(state.votes);
     this._sortVariants();
+    this._callbacks.onResize();
 };
