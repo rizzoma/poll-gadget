@@ -114,6 +114,16 @@ Variant.prototype.getUserIds = function() {
     return ids;
 };
 
+Variant.prototype.hasUnknownUsers = function() {
+    for (var i in this._users) {
+        var user = this._users[i];
+        if (user.isUnknown()) {
+            return true;
+        }
+    }
+    return false;
+};
+
 Variant.prototype.hasUser = function(userId) {
     for (var i in this._users) {
         if (this._users[i].getId() == userId) {

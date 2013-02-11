@@ -114,6 +114,16 @@ Poll.prototype._isVariantExist = function(name) {
     return false;
 };
 
+Poll.prototype.hasUnknownUsers = function() {
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        if (variant.hasUnknownUsers()) {
+            return true;
+        }
+    }
+    return false;
+};
+
 Poll.prototype._getPreparedName = function(name) {
     return $.trim(name);
 };
@@ -217,10 +227,6 @@ Poll.prototype._addVariant = function(id, name, position) {
     this._nodes.poll.append(variant.getNode());
 };
 
-Poll.prototype.updateUsers = function() {
-    
-};
-
 Poll.prototype._updateOptions = function(options) {
     this._options.update(options);
 };
@@ -314,6 +320,10 @@ User.prototype.getName = function() {
 
 User.prototype.getAvatar = function() {
     return this._avatar;
+};
+
+User.prototype.isUnknown = function() {
+    return !this._name || !this._avatar;
 };
  </script>
         <script> var Variant = function(id, name, callbacks) {
@@ -430,6 +440,16 @@ Variant.prototype.getUserIds = function() {
         ids.push(user.getId());
     }
     return ids;
+};
+
+Variant.prototype.hasUnknownUsers = function() {
+    for (var i in this._users) {
+        var user = this._users[i];
+        if (user.isUnknown()) {
+            return true;
+        }
+    }
+    return false;
 };
 
 Variant.prototype.hasUser = function(userId) {
@@ -620,10 +640,11 @@ WaveConnector.prototype._onParticipants = function() {
         });
         this._poll.init();
     }
-    this._poll.updateUsers();
     if (this._needUpdateState) {
         this._onState();
         this._needUpdateState = false;
+    } else if (this._poll.hasUnknownUsers()) {
+        this._onState();
     }
 };
 

@@ -15,3 +15,7 @@ User.prototype.getName = function() {
 User.prototype.getAvatar = function() {
     return this._avatar;
 };
+
+User.prototype.isUnknown = function() {
+    return !this._name || !this._avatar;
+};

@@ -47,6 +47,16 @@ Poll.prototype._isVariantExist = function(name) {
     return false;
 };
 
+Poll.prototype.hasUnknownUsers = function() {
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        if (variant.hasUnknownUsers()) {
+            return true;
+        }
+    }
+    return false;
+};
+
 Poll.prototype._getPreparedName = function(name) {
     return $.trim(name);
 };
@@ -148,10 +158,6 @@ Poll.prototype._addVariant = function(id, name, position) {
     this._variants.push(variant);
     this._positions[position] = id;
     this._nodes.poll.append(variant.getNode());
-};
-
-Poll.prototype.updateUsers = function() {
-    
 };
 
 Poll.prototype._updateOptions = function(options) {

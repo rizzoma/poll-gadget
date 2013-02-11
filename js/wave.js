@@ -127,10 +127,11 @@ WaveConnector.prototype._onParticipants = function() {
         });
         this._poll.init();
     }
-    this._poll.updateUsers();
     if (this._needUpdateState) {
         this._onState();
         this._needUpdateState = false;
+    } else if (this._poll.hasUnknownUsers()) {
+        this._onState();
     }
 };
 
