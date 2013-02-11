@@ -47,4 +47,9 @@ Options.prototype.init = function() {
 
 Options.prototype.update = function(options) {
     this._options = options;
+    if (this.isSingleVariantVoting()) {
+        this._node.find('input[name=singleVariantVoting]').prop('checked', true);
+    }
+    var sorting = this.getSortingOrder();
+    this._node.find('option[value=' + sorting + ']').prop('selected', true);
 };
