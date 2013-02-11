@@ -120,6 +120,8 @@ Poll.prototype._addVariant = function(id, name, position) {
             var name = this._getPreparedName(raw);
             if (name && !this._isVariantExist(name)) {
                 variant.setName(name);
+            } else {
+                variant.setName(variant.getName());
             }
             var variants = this._getUpdatedVariants();
             this._callbacks.onVariant(variants);
