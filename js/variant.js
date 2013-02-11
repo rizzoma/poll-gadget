@@ -19,19 +19,18 @@ Variant.prototype._showNameEditor = function() {
         return false;
     });
     var callback = $.proxy(function() {
-        this._name = input.val();
-        this._callbacks.onEdit();
+        var name = input.val();
+        this._callbacks.onEdit(name);
     }, this);
-    input.keydown($.proxy(function(event) {
+    input.keydown(function(event) {
         if (event.which == 10 || event.which == 13) {
             callback();
         }
-    }, this));
-    input.blur($.proxy(function() {
-        callback();
-    }, this));
+    });
+    input.blur(callback);
     this._node.find('.variant-name').empty().append(input);
     input.focus();
+    input.select();
 };
 
 Variant.prototype._addClickListener = function() {

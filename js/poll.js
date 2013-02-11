@@ -2,7 +2,10 @@ var Poll = function(viewer, callbacks) {
     this._viewer = viewer;
     this._variants = [];
     this._positions = [];
-    this._node = $('#poll');
+    this._nodes = {
+        poll: $('#poll'),
+        add: $('#add-variant')
+    };
     this._callbacks = callbacks;
     this._initOptions();
 };
@@ -44,6 +47,10 @@ Poll.prototype._isVariantExist = function(name) {
     return false;
 };
 
+Poll.prototype._getPreparedName = function(name) {
+    return $.trim(name);
+};
+
 Poll.prototype._getUpdatedVariants = function(name) {
     var updated = [];
     for (var i in this._variants) {
@@ -62,24 +69,6 @@ Poll.prototype._getUpdatedVariants = function(name) {
         });
     }
     return updated;
-};
-
-Poll.prototype._addSubmitListener = function() {
-    $('#add-variant').submit($.proxy(function(event) {
-        var text = $(event.target).find(':text');
-        var name = text.val().replace(/^\s+|\s+$/, '');
-        if (name && !this._isVariantExist(name)) {
-            var variants = this._getUpdatedVariants(name);
-            this._callbacks.onVariant(variants);
-        }
-        text.focus();
-        text.select();
-        return false;
-    }, this));
-};
-
-Poll.prototype.init = function() {
-    this._addSubmitListener();
 };
 
 Poll.prototype._getUpdatedVotes = function() {
@@ -104,9 +93,34 @@ Poll.prototype._getUpdatedVotes = function() {
     return updated;
 };
 
+Poll.prototype._addSubmitListener = function() {
+    this._nodes.add.submit($.proxy(function(event) {
+        var text = $(event.target).find(':text');
+        var name = this._getPreparedName(text.val());
+        if (name && !this._isVariantExist(name)) {
+            var variants = this._getUpdatedVariants(name);
+            this._callbacks.onVariant(variants);
+        }
+        text.focus();
+        text.select();
+        return false;
+    }, this));
+};
+
+Poll.prototype.init = function() {
+    this._addSubmitListener();
+    for (var i in this._nodes) {
+        this._nodes[i].show();
+    }
+};
+
 Poll.prototype._addVariant = function(id, name, position) {
     var variant = new Variant(id, name, {
-        onEdit: $.proxy(function() {
+        onEdit: $.proxy(function(raw) {
+            var name = this._getPreparedName(raw);
+            if (name && !this._isVariantExist(name)) {
+                variant.setName(name);
+            }
             var variants = this._getUpdatedVariants();
             this._callbacks.onVariant(variants);
         }, this),
@@ -131,7 +145,11 @@ Poll.prototype._addVariant = function(id, name, position) {
     variant.setExclusive(isExclusive);
     this._variants.push(variant);
     this._positions[position] = id;
-    this._node.append(variant.getNode());
+    this._nodes.poll.append(variant.getNode());
+};
+
+Poll.prototype.updateUsers = function() {
+    
 };
 
 Poll.prototype._updateOptions = function(options) {
@@ -196,7 +214,7 @@ Poll.prototype._sortVariants = function() {
     this._variants.sort(func);
     for (var i in this._variants) {
         var variant = this._variants[i];
-        this._node.append(variant.getNode());
+        this._nodes.poll.append(variant.getNode());
     }
 };
 

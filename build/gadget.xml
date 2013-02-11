@@ -64,7 +64,10 @@ Options.prototype.update = function(options) {
     this._viewer = viewer;
     this._variants = [];
     this._positions = [];
-    this._node = $('#poll');
+    this._nodes = {
+        poll: $('#poll'),
+        add: $('#add-variant')
+    };
     this._callbacks = callbacks;
     this._initOptions();
 };
@@ -106,6 +109,10 @@ Poll.prototype._isVariantExist = function(name) {
     return false;
 };
 
+Poll.prototype._getPreparedName = function(name) {
+    return $.trim(name);
+};
+
 Poll.prototype._getUpdatedVariants = function(name) {
     var updated = [];
     for (var i in this._variants) {
@@ -124,24 +131,6 @@ Poll.prototype._getUpdatedVariants = function(name) {
         });
     }
     return updated;
-};
-
-Poll.prototype._addSubmitListener = function() {
-    $('#add-variant').submit($.proxy(function(event) {
-        var text = $(event.target).find(':text');
-        var name = text.val().replace(/^\s+|\s+$/, '');
-        if (name && !this._isVariantExist(name)) {
-            var variants = this._getUpdatedVariants(name);
-            this._callbacks.onVariant(variants);
-        }
-        text.focus();
-        text.select();
-        return false;
-    }, this));
-};
-
-Poll.prototype.init = function() {
-    this._addSubmitListener();
 };
 
 Poll.prototype._getUpdatedVotes = function() {
@@ -166,9 +155,34 @@ Poll.prototype._getUpdatedVotes = function() {
     return updated;
 };
 
+Poll.prototype._addSubmitListener = function() {
+    this._nodes.add.submit($.proxy(function(event) {
+        var text = $(event.target).find(':text');
+        var name = this._getPreparedName(text.val());
+        if (name && !this._isVariantExist(name)) {
+            var variants = this._getUpdatedVariants(name);
+            this._callbacks.onVariant(variants);
+        }
+        text.focus();
+        text.select();
+        return false;
+    }, this));
+};
+
+Poll.prototype.init = function() {
+    this._addSubmitListener();
+    for (var i in this._nodes) {
+        this._nodes[i].show();
+    }
+};
+
 Poll.prototype._addVariant = function(id, name, position) {
     var variant = new Variant(id, name, {
-        onEdit: $.proxy(function() {
+        onEdit: $.proxy(function(raw) {
+            var name = this._getPreparedName(raw);
+            if (name && !this._isVariantExist(name)) {
+                variant.setName(name);
+            }
             var variants = this._getUpdatedVariants();
             this._callbacks.onVariant(variants);
         }, this),
@@ -193,7 +207,11 @@ Poll.prototype._addVariant = function(id, name, position) {
     variant.setExclusive(isExclusive);
     this._variants.push(variant);
     this._positions[position] = id;
-    this._node.append(variant.getNode());
+    this._nodes.poll.append(variant.getNode());
+};
+
+Poll.prototype.updateUsers = function() {
+    
 };
 
 Poll.prototype._updateOptions = function(options) {
@@ -258,7 +276,7 @@ Poll.prototype._sortVariants = function() {
     this._variants.sort(func);
     for (var i in this._variants) {
         var variant = this._variants[i];
-        this._node.append(variant.getNode());
+        this._nodes.poll.append(variant.getNode());
     }
 };
 
@@ -312,19 +330,18 @@ Variant.prototype._showNameEditor = function() {
         return false;
     });
     var callback = $.proxy(function() {
-        this._name = input.val();
-        this._callbacks.onEdit();
+        var name = input.val();
+        this._callbacks.onEdit(name);
     }, this);
-    input.keydown($.proxy(function(event) {
+    input.keydown(function(event) {
         if (event.which == 10 || event.which == 13) {
             callback();
         }
-    }, this));
-    input.blur($.proxy(function() {
-        callback();
-    }, this));
+    });
+    input.blur(callback);
     this._node.find('.variant-name').empty().append(input);
     input.focus();
+    input.select();
 };
 
 Variant.prototype._addClickListener = function() {
@@ -548,6 +565,8 @@ Converter.prototype.options2state = function(options) {
 
 var WaveConnector = function() {
     this._converter = new Converter();
+    this._poll = null;
+    this._needUpdateState = false;
 };
 
 WaveConnector.prototype._onVariant = function(variants) {
@@ -564,33 +583,52 @@ WaveConnector.prototype._onVote = function(mode, votes) {
 
 WaveConnector.prototype._onOptions = function(options) {
     var state = wave.getState();
-    var delta = this._converter.options2state(options)
+    var delta = this._converter.options2state(options);
     state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onLoad = function() {
-    var viewer = this._converter.participant2user(wave.getViewer());
-    var poll = new Poll(viewer, {
-        onVariant: $.proxy(this._onVariant, this),
-        onVote: $.proxy(this._onVote, this),
-        onOptions: $.proxy(this._onOptions, this),
-        onResize: function() {
-            gadgets.window.adjustHeight();
+WaveConnector.prototype._onParticipants = function() {
+    if (!this._poll) {
+        var participant = wave.getViewer();
+        if (!participant) {
+            return;
         }
-    });
-    wave.setStateCallback($.proxy(function() {
-        var state = wave.getState();
-        poll.updateState({
-            variants: this._converter.state2variants(state),
-            votes: this._converter.state2votes(state),
-            options: this._converter.state2options(state)
+        var viewer = this._converter.participant2user(participant);
+        this._poll = new Poll(viewer, {
+            onVariant: $.proxy(this._onVariant, this),
+            onVote: $.proxy(this._onVote, this),
+            onOptions: $.proxy(this._onOptions, this),
+            onResize: function() {
+                gadgets.window.adjustHeight();
+            }
         });
-    }, this));
-    poll.init();
+        this._poll.init();
+    }
+    this._poll.updateUsers();
+    if (this._needUpdateState) {
+        this._onState();
+        this._needUpdateState = false;
+    }
+};
+
+WaveConnector.prototype._onState = function() {
+    if (!this._poll) {
+        this._needUpdateState = true;
+        return;
+    }
+    var state = wave.getState();
+    this._poll.updateState({
+        variants: this._converter.state2variants(state),
+        votes: this._converter.state2votes(state),
+        options: this._converter.state2options(state)
+    });
 };
 
 WaveConnector.prototype.init = function() {
-    gadgets.util.registerOnLoadHandler($.proxy(this._onLoad, this));
+    gadgets.util.registerOnLoadHandler($.proxy(function() {
+        wave.setParticipantCallback($.proxy(this._onParticipants, this));
+        wave.setStateCallback($.proxy(this._onState, this));
+    }, this));
 };
 
 var connector = new WaveConnector();
@@ -599,6 +637,7 @@ connector.init();
         <style> * {
     padding: 0;
     margin: 0;
+    font-size: 13px;
 }
 
 .button {
@@ -612,6 +651,10 @@ connector.init();
 
 .button.disabled {
     visibility: hidden;
+}
+
+#poll {
+    display: none;
 }
 
 .variant {
@@ -685,6 +728,7 @@ connector.init();
 
 #add-variant {
     padding: 4px;
+    display: none;
 }
 
 #add-variant input {

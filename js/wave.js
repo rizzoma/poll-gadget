@@ -80,6 +80,8 @@ Converter.prototype.options2state = function(options) {
 
 var WaveConnector = function() {
     this._converter = new Converter();
+    this._poll = null;
+    this._needUpdateState = false;
 };
 
 WaveConnector.prototype._onVariant = function(variants) {
@@ -96,33 +98,52 @@ WaveConnector.prototype._onVote = function(mode, votes) {
 
 WaveConnector.prototype._onOptions = function(options) {
     var state = wave.getState();
-    var delta = this._converter.options2state(options)
+    var delta = this._converter.options2state(options);
     state.submitDelta(delta);
 };
 
-WaveConnector.prototype._onLoad = function() {
-    var viewer = this._converter.participant2user(wave.getViewer());
-    var poll = new Poll(viewer, {
-        onVariant: $.proxy(this._onVariant, this),
-        onVote: $.proxy(this._onVote, this),
-        onOptions: $.proxy(this._onOptions, this),
-        onResize: function() {
-            gadgets.window.adjustHeight();
+WaveConnector.prototype._onParticipants = function() {
+    if (!this._poll) {
+        var participant = wave.getViewer();
+        if (!participant) {
+            return;
         }
-    });
-    wave.setStateCallback($.proxy(function() {
-        var state = wave.getState();
-        poll.updateState({
-            variants: this._converter.state2variants(state),
-            votes: this._converter.state2votes(state),
-            options: this._converter.state2options(state)
+        var viewer = this._converter.participant2user(participant);
+        this._poll = new Poll(viewer, {
+            onVariant: $.proxy(this._onVariant, this),
+            onVote: $.proxy(this._onVote, this),
+            onOptions: $.proxy(this._onOptions, this),
+            onResize: function() {
+                gadgets.window.adjustHeight();
+            }
         });
-    }, this));
-    poll.init();
+        this._poll.init();
+    }
+    this._poll.updateUsers();
+    if (this._needUpdateState) {
+        this._onState();
+        this._needUpdateState = false;
+    }
+};
+
+WaveConnector.prototype._onState = function() {
+    if (!this._poll) {
+        this._needUpdateState = true;
+        return;
+    }
+    var state = wave.getState();
+    this._poll.updateState({
+        variants: this._converter.state2variants(state),
+        votes: this._converter.state2votes(state),
+        options: this._converter.state2options(state)
+    });
 };
 
 WaveConnector.prototype.init = function() {
-    gadgets.util.registerOnLoadHandler($.proxy(this._onLoad, this));
+    gadgets.util.registerOnLoadHandler($.proxy(function() {
+        wave.setParticipantCallback($.proxy(this._onParticipants, this));
+        wave.setStateCallback($.proxy(this._onState, this));
+    }, this));
 };
 
 var connector = new WaveConnector();
