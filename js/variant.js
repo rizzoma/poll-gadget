@@ -45,6 +45,7 @@ Variant.prototype._addClickListener = function() {
         if (element.hasClass('variant-edit')) {
             this._showNameEditor();
         }
+        return false;
     }, this));
 };
 
@@ -52,15 +53,15 @@ Variant.prototype._createNode = function() {
     this._node = $(
         '<div class="variant"> \
             <label class="variant-name-container"> \
-                <input type="checkbox" name="variant"><span class="variant-name"></span> \
-            </label> \
-            <span class="variant-controls"> \
-                <button class="button variant-move-up" title="Move up"></button> \
-                <button class="button variant-move-down" title="Move down"></button> \
-                <button class="button variant-edit" title="Edit title"></button> \
-            </span> \
-            <span class="variant-vote-count"></span> \
-            <span class="variant-voters"></span> \
+                <input type="checkbox" name="variant"> \
+                <span class="variant-name"></span> \
+                <span class="variant-vote-count" title="Voters"></span> \
+                <div class="variant-controls"> \
+                    <button class="button variant-move-up" title="Move up"></button> \
+                    <button class="button variant-move-down" title="Move down"></button> \
+                    <button class="button variant-edit" title="Edit title"></button> \
+                </div> \
+            </label><div class="variant-voters"></div> \
         </div>'
     );
     this._node.find('.variant-name').text(this._name);
@@ -78,7 +79,7 @@ Variant.prototype.getName = function() {
 
 Variant.prototype.setName = function(name) {
     this._name = name;
-    this._node.find('.variant-name').text(name);
+    this._node.find('.variant-name').empty().text(name);
 };
 
 Variant.prototype.getNode = function() {

@@ -1,7 +1,7 @@
 * {
     padding: 0;
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .button {
@@ -22,17 +22,20 @@
 }
 
 .variant {
-    height: 35px;
+    min-height: 35px;
+    padding: 4px;
+}
+
+.variant.voted {
+    background: #90EE90;
 }
 
 .variant-name-container {
     display: inline-block;
-    line-height: 35px;
-    width: 250px;
-}
-
-.variant.voted .variant-name-container {
-    background: lightgreen;
+    width: 25%;
+    min-height: 35px;
+    position: relative;
+    vertical-align: top;
 }
 
 .variant-name-container input {
@@ -42,11 +45,14 @@
 }
 
 .variant-controls {
-    visibility: hidden;
+    display: none;
+    position: absolute;
+    right: 2px;
+    top: 2px;
 }
 
 .variant:hover .variant-controls {
-    visibility: visible;
+    display: block;
 }
 
 .variant-move-up {
@@ -74,10 +80,14 @@
 }
 
 .variant-vote-count {
+    font-weight: bold;
+}
+
+.variant-voters {
     display: inline-block;
-    line-height: 35px;
-    width: 40px;
-    text-align: right;
+    min-height: 35px;
+    width: 75%;
+    vertical-align: top;
 }
 
 .variant-avatar {
@@ -87,12 +97,12 @@
     background: no-repeat center center;
     background-size: 30px;
     margin: 2px;
-    vertical-align: middle;
+    vertical-align: top;
 }
 
 #add-variant {
-    padding: 4px;
     display: none;
+    padding: 4px;
 }
 
 #add-variant input {
