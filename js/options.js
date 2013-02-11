@@ -18,6 +18,12 @@ Options.prototype.getSortingOrder = function() {
     return this._options.sorting || this.SORTING.NONE;
 };
 
+Options.prototype.setSortingOrder = function(order) {
+    var options = $.extend({}, this._options);
+    options.sorting = order;
+    this._callbacks.onChange(options);
+};
+
 Options.prototype._addClickListener = function() {
     $('.toggle-options').click($.proxy(function() {
         this._node.toggle();

@@ -142,6 +142,7 @@ Poll.prototype._addVariant = function(id, name, position) {
             this._callbacks.onVote(mode, votes);
         }, this),
         onMove: $.proxy(function(delta) {
+            this._options.setSortingOrder(this._options.SORTING.NONE);
             var position = this._getVariantPosition(variant);
             var newPosition = position + delta;
             if (newPosition < 0 || newPosition >= this._positions.length) {
