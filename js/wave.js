@@ -2,6 +2,14 @@ var Converter = function() {
     
 };
 
+Converter.prototype._getUserById = function(id) {
+    var participant = wave.getParticipantById(id);
+    if (!participant) {
+        return new User(id);
+    }
+    return this.participant2user(participant);
+};
+
 Converter.prototype._serialize = function(object) {
     return gadgets.json.stringify(object);
 };
@@ -43,7 +51,7 @@ Converter.prototype.state2votes = function(state) {
         var userIds = this._unserialize(state.get(key));
         for (var j in userIds) {
             var userId = userIds[j];
-            var user = this.participant2user(wave.getParticipantById(userId));
+            var user = this._getUserById(userId);
             if (!(mode in votes)) {
                 votes[mode] = {};
             }

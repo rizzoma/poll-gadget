@@ -59,12 +59,10 @@ Options.prototype.init = function() {
 Options.prototype.update = function(options) {
     this._options = options;
     if (this.isSingleVariantVoting()) {
-        this._node.find(':checkbox[name=singleVariantVoting]').prop('checked', true);
+        this._node.find('input[name=singleVariantVoting]').prop('checked', true);
     }
     var sorting = this.getSortingOrder();
-    if (sorting != this.SORTING.NONE) {
-        this._node.find('option[value=' + sorting + ']').prop('selected', true);
-    }
+    this._node.find('option[value=' + sorting + ']').prop('selected', true);
 };
  </script>
         <script> var Poll = function(viewer, callbacks) {
@@ -497,6 +495,14 @@ Variant.prototype.reset = function() {
     
 };
 
+Converter.prototype._getUserById = function(id) {
+    var participant = wave.getParticipantById(id);
+    if (!participant) {
+        return new User(id);
+    }
+    return this.participant2user(participant);
+};
+
 Converter.prototype._serialize = function(object) {
     return gadgets.json.stringify(object);
 };
@@ -538,7 +544,7 @@ Converter.prototype.state2votes = function(state) {
         var userIds = this._unserialize(state.get(key));
         for (var j in userIds) {
             var userId = userIds[j];
-            var user = this.participant2user(wave.getParticipantById(userId));
+            var user = this._getUserById(userId);
             if (!(mode in votes)) {
                 votes[mode] = {};
             }
@@ -740,7 +746,7 @@ connector.init();
     display: inline-block;
     width: 30px;
     height: 30px;
-    background: no-repeat center center;
+    background: no-repeat center center url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAAAXNSR0IArs4c6QAAAAZiS0dEAAAAAAAA+UO7fwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB90CCwsqLJ5TPhoAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAABVklEQVRIx8WXPXaCQBSFLzTpWAFS5wR7wwbABTjQekyTXRAXoJS6BmcBBDcAC5Bgl0JWMJ3VS0OTgMRBBm75Bt43d37eeQP8ERHNiGhHRAU9rqLKNUObqo9UaXcLGpN6xUM6bXSuVeufYVi96gCWGF5LjYgKAM8Dg88aEdEIjq+67B9CCAQBg2WZsCwT0+kLOD/IpnmSdhwEDGma1uJxnMC27bvzSDtuggLA8ZhI5dH72jTDMNSBk+Tz5phSx0KI3o61FJgxH4z5jWObzVbtHi8WrBbzvDlMc6IW7DgOHMf5FVut3tQuNQBwfkCe57WDVZYXqTx3FZCyvIBzDs55K4AxH67rwvPmj4GFEFivP6RLomlOEIZh6wRawVG0RRRtOxeU0+mr2x5nWdr5nv5353srmZLwqw7grArcUr+/tar5eh+4EdiP1uyN1t6O29CP+oQZ+tH2A7hKi1LYi2wAAAAAAElFTkSuQmCC);
     background-size: 30px;
     margin: 2px;
     vertical-align: top;

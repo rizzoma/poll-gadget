@@ -94,7 +94,7 @@
     display: inline-block;
     width: 30px;
     height: 30px;
-    background: no-repeat center center;
+    background: no-repeat center center url(data:image/png;base64,%% img/unknown.png base64 %%);
     background-size: 30px;
     margin: 2px;
     vertical-align: top;
