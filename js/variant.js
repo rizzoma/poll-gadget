@@ -1,6 +1,7 @@
-var Variant = function(id, name, callbacks) {
+var Variant = function(id, name, isExclusive, callbacks) {
     this._id = id;
     this._name = name;
+    this._isExclusive = isExclusive;
     this._users = [];
     this._callbacks = callbacks;
     this._createNode();
@@ -45,6 +46,9 @@ Variant.prototype._addClickListener = function() {
         if (element.hasClass('variant-edit')) {
             this._showNameEditor();
         }
+        if (element.hasClass('variant-remove')) {
+            this._callbacks.onRemove();
+        }
         return false;
     }, this));
 };
@@ -53,13 +57,14 @@ Variant.prototype._createNode = function() {
     this._node = $(
         '<div class="variant"> \
             <label class="variant-name-container"> \
-                <input type="checkbox" name="variant"> \
+                <input type="' + (this._isExclusive ? 'radio' : 'checkbox') + '" name="variant"> \
                 <span class="variant-name"></span> \
                 <span class="variant-vote-count" title="Voters"></span> \
                 <div class="variant-controls"> \
                     <button class="button variant-move-up" title="Move up"></button> \
                     <button class="button variant-move-down" title="Move down"></button> \
                     <button class="button variant-edit" title="Edit title"></button> \
+                    <button class="button variant-remove" title="Remove variant"></button> \
                 </div> \
             </label><div class="variant-voters"></div> \
         </div>'
@@ -90,13 +95,12 @@ Variant.prototype.getVoteCount = function() {
     return this._users.length;
 };
 
-Variant.prototype.setExclusive = function(isExclusive) {
-    var type = isExclusive ? 'radio' : 'checkbox';
-    this._node.find(':checkbox,:radio').attr('type', type);
-};
-
 Variant.prototype.hasVote = function() {
     return this._node.find(':checkbox,:radio').is(':checked');
+};
+
+Variant.prototype.setHasVotes = function() {
+    this._node.find('.variant-edit,.variant-remove').addClass('disabled');
 };
 
 Variant.prototype._updateVoteCount = function() {
@@ -124,15 +128,6 @@ Variant.prototype.hasUnknownUsers = function() {
     return false;
 };
 
-Variant.prototype.hasUser = function(userId) {
-    for (var i in this._users) {
-        if (this._users[i].getId() == userId) {
-            return true;
-        }
-    }
-    return false;
-};
-
 Variant.prototype.addUser = function(user, isCurrentUser) {
     this._users.push(user);
     var node = $('<span class="variant-avatar variant-user-' + user.getId() + '"></span>');
@@ -150,35 +145,4 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
         this._node.addClass('voted');
         this._node.find(':checkbox,:radio').prop('checked', true);
     }
-    if (this._users.length > 1 || !isCurrentUser) {
-        this._node.find('.variant-edit').addClass('disabled');
-    }
-};
-
-Variant.prototype._removeUser = function(userId) {
-    if (!this.hasUser(userId)) {
-        return;
-    }
-    for (var i in this._users) {
-        if (this._users[i].getId() == userId) {
-            this._users.splice(i, 1);
-            break;
-        }
-    }
-    this._node.find('.variant-voters .variant-user-' + userId).remove();
-    this._updateVoteCount();
-    
-};
-
-Variant.prototype.reset = function() {
-    var ids = [];
-    for (var i in this._users) {
-        ids.push(this._users[i].getId());
-    }
-    for (var i in ids) {
-        this._removeUser(ids[i]);
-    }
-    this._node.removeClass('voted');
-    this._node.find(':checkbox,:radio').prop('checked', false);
-    this._node.find('.variant-edit').removeClass('disabled');
 };

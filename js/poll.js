@@ -73,7 +73,7 @@ Poll.prototype._getUpdatedVariants = function(name) {
     }
     if (name) {
         updated.push({
-            id: this._variants.length,
+            id: (new Date()).getTime(),
             name: name,
             position: this._positions.length
         });
@@ -125,7 +125,8 @@ Poll.prototype.init = function() {
 };
 
 Poll.prototype._addVariant = function(id, name, position) {
-    var variant = new Variant(id, name, {
+    var isExclusive = this._options.isSingleVariantVoting();
+    var variant = new Variant(id, name, isExclusive, {
         onEdit: $.proxy(function(raw) {
             var name = this._getPreparedName(raw);
             if (name && !this._isVariantExist(name)) {
@@ -152,13 +153,29 @@ Poll.prototype._addVariant = function(id, name, position) {
             this._positions[newPosition] = id;
             var variants = this._getUpdatedVariants();
             this._callbacks.onVariant(variants);
+        }, this),
+        onRemove: $.proxy(function() {
+            this._removeVariant(id);
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
         }, this)
     });
-    var isExclusive = this._options.isSingleVariantVoting();
-    variant.setExclusive(isExclusive);
     this._variants.push(variant);
     this._positions[position] = id;
     this._nodes.poll.append(variant.getNode());
+};
+
+Poll.prototype._removeVariant = function(id) {
+    var variant = this._getVariantById(id);
+    variant.getNode().remove();
+    var position = $.inArray(id, this._positions);
+    this._positions.splice(position, 1);
+    for (var i in this._variants) {
+        if (this._variants[i].getId() == id) {
+            this._variants.splice(i, 1);
+            break;
+        }
+    }
 };
 
 Poll.prototype._updateOptions = function(options) {
@@ -166,31 +183,49 @@ Poll.prototype._updateOptions = function(options) {
 };
 
 Poll.prototype._updateVariants = function(variants) {
-    for (var i in this._variants) {
-        this._variants[i].reset();
+    while (this._variants.length) {
+        var variant = this._variants[0];
+        this._removeVariant(variant.getId());
     }
-    var isExclusive = this._options.isSingleVariantVoting();
     for (var i in variants) {
-        var info = variants[i];
-        if (!this._isVariantExist(info.name)) {
-            this._addVariant(info.id, info.name, info.position);
-        } else {
-            var variant = this._getVariantById(info.id);
-            variant.setName(info.name);
-            variant.setExclusive(isExclusive);
-        }
+        var variant = variants[i];
+        this._addVariant(variant.id, variant.name, variant.position);
     }
 };
 
 Poll.prototype._updateVotes = function(votes) {
+    var getUsers = function(mode, id) {
+        if (!(mode in votes)) {
+            return [];
+        }
+        if (!(id in votes[mode])) {
+            return [];
+        }
+        return votes[mode][id];
+    };
+    var viewerId = this._viewer.getId();
+    var hasVotes = $.proxy(function(id) {
+        for (var i in this.MODES) {
+            var users = getUsers(this.MODES[i], id);
+            for (var j in users) {
+                if (users[j].getId() != viewerId) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }, this);
     var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
-    var modeVotes = votes[mode] || {};
-    for (var variantId in modeVotes) {
-        var variant = this._getVariantById(variantId);
-        var users = modeVotes[variantId];
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        var variantId = variant.getId();
+        if (hasVotes(variantId)) {
+            variant.setHasVotes();
+        }
+        var users = getUsers(mode, variantId);
         for (var j in users) {
             var user = users[j];
-            variant.addUser(user, user.getId() == this._viewer.getId());
+            variant.addUser(user, user.getId() == viewerId);
         }
     }
 };

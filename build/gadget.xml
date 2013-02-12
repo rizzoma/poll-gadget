@@ -146,7 +146,7 @@ Poll.prototype._getUpdatedVariants = function(name) {
     }
     if (name) {
         updated.push({
-            id: this._variants.length,
+            id: (new Date()).getTime(),
             name: name,
             position: this._positions.length
         });
@@ -198,7 +198,8 @@ Poll.prototype.init = function() {
 };
 
 Poll.prototype._addVariant = function(id, name, position) {
-    var variant = new Variant(id, name, {
+    var isExclusive = this._options.isSingleVariantVoting();
+    var variant = new Variant(id, name, isExclusive, {
         onEdit: $.proxy(function(raw) {
             var name = this._getPreparedName(raw);
             if (name && !this._isVariantExist(name)) {
@@ -225,13 +226,29 @@ Poll.prototype._addVariant = function(id, name, position) {
             this._positions[newPosition] = id;
             var variants = this._getUpdatedVariants();
             this._callbacks.onVariant(variants);
+        }, this),
+        onRemove: $.proxy(function() {
+            this._removeVariant(id);
+            var variants = this._getUpdatedVariants();
+            this._callbacks.onVariant(variants);
         }, this)
     });
-    var isExclusive = this._options.isSingleVariantVoting();
-    variant.setExclusive(isExclusive);
     this._variants.push(variant);
     this._positions[position] = id;
     this._nodes.poll.append(variant.getNode());
+};
+
+Poll.prototype._removeVariant = function(id) {
+    var variant = this._getVariantById(id);
+    variant.getNode().remove();
+    var position = $.inArray(id, this._positions);
+    this._positions.splice(position, 1);
+    for (var i in this._variants) {
+        if (this._variants[i].getId() == id) {
+            this._variants.splice(i, 1);
+            break;
+        }
+    }
 };
 
 Poll.prototype._updateOptions = function(options) {
@@ -239,31 +256,49 @@ Poll.prototype._updateOptions = function(options) {
 };
 
 Poll.prototype._updateVariants = function(variants) {
-    for (var i in this._variants) {
-        this._variants[i].reset();
+    while (this._variants.length) {
+        var variant = this._variants[0];
+        this._removeVariant(variant.getId());
     }
-    var isExclusive = this._options.isSingleVariantVoting();
     for (var i in variants) {
-        var info = variants[i];
-        if (!this._isVariantExist(info.name)) {
-            this._addVariant(info.id, info.name, info.position);
-        } else {
-            var variant = this._getVariantById(info.id);
-            variant.setName(info.name);
-            variant.setExclusive(isExclusive);
-        }
+        var variant = variants[i];
+        this._addVariant(variant.id, variant.name, variant.position);
     }
 };
 
 Poll.prototype._updateVotes = function(votes) {
+    var getUsers = function(mode, id) {
+        if (!(mode in votes)) {
+            return [];
+        }
+        if (!(id in votes[mode])) {
+            return [];
+        }
+        return votes[mode][id];
+    };
+    var viewerId = this._viewer.getId();
+    var hasVotes = $.proxy(function(id) {
+        for (var i in this.MODES) {
+            var users = getUsers(this.MODES[i], id);
+            for (var j in users) {
+                if (users[j].getId() != viewerId) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }, this);
     var mode = this._options.isSingleVariantVoting() ? this.MODES.SINGLE : this.MODES.MULTI;
-    var modeVotes = votes[mode] || {};
-    for (var variantId in modeVotes) {
-        var variant = this._getVariantById(variantId);
-        var users = modeVotes[variantId];
+    for (var i in this._variants) {
+        var variant = this._variants[i];
+        var variantId = variant.getId();
+        if (hasVotes(variantId)) {
+            variant.setHasVotes();
+        }
+        var users = getUsers(mode, variantId);
         for (var j in users) {
             var user = users[j];
-            variant.addUser(user, user.getId() == this._viewer.getId());
+            variant.addUser(user, user.getId() == viewerId);
         }
     }
 };
@@ -333,9 +368,10 @@ User.prototype.isUnknown = function() {
     return !this._name || !this._avatar;
 };
  </script>
-        <script> var Variant = function(id, name, callbacks) {
+        <script> var Variant = function(id, name, isExclusive, callbacks) {
     this._id = id;
     this._name = name;
+    this._isExclusive = isExclusive;
     this._users = [];
     this._callbacks = callbacks;
     this._createNode();
@@ -380,6 +416,9 @@ Variant.prototype._addClickListener = function() {
         if (element.hasClass('variant-edit')) {
             this._showNameEditor();
         }
+        if (element.hasClass('variant-remove')) {
+            this._callbacks.onRemove();
+        }
         return false;
     }, this));
 };
@@ -388,13 +427,14 @@ Variant.prototype._createNode = function() {
     this._node = $(
         '<div class="variant"> \
             <label class="variant-name-container"> \
-                <input type="checkbox" name="variant"> \
+                <input type="' + (this._isExclusive ? 'radio' : 'checkbox') + '" name="variant"> \
                 <span class="variant-name"></span> \
                 <span class="variant-vote-count" title="Voters"></span> \
                 <div class="variant-controls"> \
                     <button class="button variant-move-up" title="Move up"></button> \
                     <button class="button variant-move-down" title="Move down"></button> \
                     <button class="button variant-edit" title="Edit title"></button> \
+                    <button class="button variant-remove" title="Remove variant"></button> \
                 </div> \
             </label><div class="variant-voters"></div> \
         </div>'
@@ -425,13 +465,12 @@ Variant.prototype.getVoteCount = function() {
     return this._users.length;
 };
 
-Variant.prototype.setExclusive = function(isExclusive) {
-    var type = isExclusive ? 'radio' : 'checkbox';
-    this._node.find(':checkbox,:radio').attr('type', type);
-};
-
 Variant.prototype.hasVote = function() {
     return this._node.find(':checkbox,:radio').is(':checked');
+};
+
+Variant.prototype.setHasVotes = function() {
+    this._node.find('.variant-edit,.variant-remove').addClass('disabled');
 };
 
 Variant.prototype._updateVoteCount = function() {
@@ -459,15 +498,6 @@ Variant.prototype.hasUnknownUsers = function() {
     return false;
 };
 
-Variant.prototype.hasUser = function(userId) {
-    for (var i in this._users) {
-        if (this._users[i].getId() == userId) {
-            return true;
-        }
-    }
-    return false;
-};
-
 Variant.prototype.addUser = function(user, isCurrentUser) {
     this._users.push(user);
     var node = $('<span class="variant-avatar variant-user-' + user.getId() + '"></span>');
@@ -485,37 +515,6 @@ Variant.prototype.addUser = function(user, isCurrentUser) {
         this._node.addClass('voted');
         this._node.find(':checkbox,:radio').prop('checked', true);
     }
-    if (this._users.length > 1 || !isCurrentUser) {
-        this._node.find('.variant-edit').addClass('disabled');
-    }
-};
-
-Variant.prototype._removeUser = function(userId) {
-    if (!this.hasUser(userId)) {
-        return;
-    }
-    for (var i in this._users) {
-        if (this._users[i].getId() == userId) {
-            this._users.splice(i, 1);
-            break;
-        }
-    }
-    this._node.find('.variant-voters .variant-user-' + userId).remove();
-    this._updateVoteCount();
-    
-};
-
-Variant.prototype.reset = function() {
-    var ids = [];
-    for (var i in this._users) {
-        ids.push(this._users[i].getId());
-    }
-    for (var i in ids) {
-        this._removeUser(ids[i]);
-    }
-    this._node.removeClass('voted');
-    this._node.find(':checkbox,:radio').prop('checked', false);
-    this._node.find('.variant-edit').removeClass('disabled');
 };
  </script>
         <script> var Converter = function() {
@@ -689,7 +688,7 @@ connector.init();
     height: 20px;
     border: 0;
     vertical-align: middle;
-    background: no-repeat url(data:image/png;base64,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);
+    background: no-repeat url(data:image/png;base64,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);
     cursor: pointer;
 }
 
@@ -757,6 +756,14 @@ connector.init();
 
 .variant-edit:hover {
     background-position: -100px 0;
+}
+
+.variant-remove {
+    background-position: -160px 0;
+}
+
+.variant-remove:hover {
+    background-position: -180px 0;
 }
 
 .variant-vote-count {

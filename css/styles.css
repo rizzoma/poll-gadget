@@ -79,6 +79,14 @@
     background-position: -100px 0;
 }
 
+.variant-remove {
+    background-position: -160px 0;
+}
+
+.variant-remove:hover {
+    background-position: -180px 0;
+}
+
 .variant-vote-count {
     font-weight: bold;
 }
