@@ -137,3 +137,7 @@
 #options input {
     vertical-align: middle;
 }
+
+.about-link {
+    margin-left: 5px;
+}

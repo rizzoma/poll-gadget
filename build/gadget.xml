@@ -816,6 +816,10 @@ connector.init();
 #options input {
     vertical-align: middle;
 }
+
+.about-link {
+    margin-left: 5px;
+}
  </style>
     </head>
     <body>
@@ -833,6 +837,7 @@ connector.init();
                     <option value="1">Sort alphanumerical</option>
                     <option value="2">Sort by votes, alphanumerical</option>
                 </select>
+                <a href="https://github.com/rizzoma/poll-gadget" target="_blank" class="about-link">about</a>
             </label>
         </div>
     </body>
