@@ -70,6 +70,9 @@ Variant.prototype._createNode = function() {
         </div>'
     );
     this._node.find('.variant-name').text(this._name);
+    if (!this._callbacks.onMove) {
+        this._node.find('.variant-move-up,.variant-move-down').addClass('disabled');
+    }
     this._addChangeListener();
     this._addClickListener();
 };

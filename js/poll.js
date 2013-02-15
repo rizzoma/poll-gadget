@@ -126,6 +126,7 @@ Poll.prototype.init = function() {
 
 Poll.prototype._addVariant = function(id, name, position) {
     var isExclusive = this._options.isSingleVariantVoting();
+    var allowMove = this._options.getSortingOrder() == this._options.SORTING.NONE;
     var variant = new Variant(id, name, isExclusive, {
         onEdit: $.proxy(function(raw) {
             var name = this._getPreparedName(raw);
@@ -142,8 +143,7 @@ Poll.prototype._addVariant = function(id, name, position) {
             var votes = this._getUpdatedVotes();
             this._callbacks.onVote(mode, votes);
         }, this),
-        onMove: $.proxy(function(delta) {
-            this._options.setSortingOrder(this._options.SORTING.NONE);
+        onMove: allowMove ? $.proxy(function(delta) {
             var position = this._getVariantPosition(variant);
             var newPosition = position + delta;
             if (newPosition < 0 || newPosition >= this._positions.length) {
@@ -153,7 +153,7 @@ Poll.prototype._addVariant = function(id, name, position) {
             this._positions[newPosition] = id;
             var variants = this._getUpdatedVariants();
             this._callbacks.onVariant(variants);
-        }, this),
+        }, this) : null,
         onRemove: $.proxy(function() {
             this._removeVariant(id);
             var variants = this._getUpdatedVariants();
