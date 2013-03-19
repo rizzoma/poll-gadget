@@ -17,5 +17,5 @@ User.prototype.getAvatar = function() {
 };
 
 User.prototype.isUnknown = function() {
-    return !this._name || !this._avatar;
+    return !this._name || this._name == '(...)';
 };
