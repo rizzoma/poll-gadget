@@ -115,6 +115,11 @@
 
 #add-variant input {
     padding: 4px;
+    width: 100px;
+}
+
+#add-variant input:focus {
+    width: 250px;
 }
 
 .toggle-options {
