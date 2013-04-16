@@ -796,6 +796,9 @@ connector.init();
 
 #add-variant input {
     padding: 4px;
+}
+
+#add-variant input[type=text] {
     width: 250px;
 }
 
